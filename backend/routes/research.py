@@ -44,19 +44,17 @@ async def analyze_research(request: ResearchRequest):
         },
     )
 
+from fastapi import Depends
+from services.auth import get_current_user
+
 @router.get("/history")
-async def get_history(user_id: str, limit: int = 20):
-    """Fetch saved research history for a user."""
+async def get_history(limit: int = 20, current_user = Depends(get_current_user)):
+    """Fetch saved research history for a user verified by Supabase JWT."""
     import database
     
-    if not user_id:
-        raise HTTPException(status_code=400, detail="user_id is required")
-        
-    queries = await database.get_queries(limit=limit, user_id=user_id)
-    
-    # Optional: fetch analysis for these queries if needed, 
-    # but returning the queries is a good start.
+    queries = await database.get_queries(limit=limit, user_id=current_user.id)
     return {"queries": queries}
+
 
 @router.post("/chat")
 async def research_chat(request: ChatRequest):

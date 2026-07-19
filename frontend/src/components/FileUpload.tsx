@@ -1,12 +1,13 @@
 import { useState, useRef } from 'react';
 import { Upload, X, FileText, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface FileUploadProps {
-    userId: string;
     onUploadSuccess?: () => void;
 }
 
-export default function FileUpload({ userId, onUploadSuccess }: FileUploadProps) {
+export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
+    const { session } = useAuth();
     const [isDragging, setIsDragging] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [status, setStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
@@ -34,6 +35,11 @@ export default function FileUpload({ userId, onUploadSuccess }: FileUploadProps)
 
     const uploadFile = async () => {
         if (!file) return;
+        if (!session) {
+            setStatus('error');
+            setMessage('Please log in to upload PDF documents.');
+            return;
+        }
         setStatus('uploading');
 
         const formData = new FormData();
@@ -41,8 +47,11 @@ export default function FileUpload({ userId, onUploadSuccess }: FileUploadProps)
 
         try {
             const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-            const res = await fetch(`${apiBase}/library/upload?user_id=${userId}`, {
+            const res = await fetch(`${apiBase}/library/upload`, {
                 method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`
+                },
                 body: formData,
             });
 
@@ -57,6 +66,7 @@ export default function FileUpload({ userId, onUploadSuccess }: FileUploadProps)
             setMessage(err.message || 'Failed to upload PDF.');
         }
     };
+
 
     return (
         <div className="space-y-4">

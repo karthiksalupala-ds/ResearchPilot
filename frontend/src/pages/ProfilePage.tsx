@@ -11,16 +11,20 @@ interface SavedQuery {
 }
 
 export function ProfilePage() {
-    const { user, loading } = useAuth();
+    const { user, session, loading } = useAuth();
     const [history, setHistory] = useState<SavedQuery[]>([]);
     const [fetching, setFetching] = useState(true);
 
     useEffect(() => {
-        if (!user) return;
+        if (!user || !session) return;
 
         const fetchHistory = async () => {
             try {
-                const response = await fetch(`http://localhost:8000/history?user_id=${user.id}`);
+                const response = await fetch(`http://localhost:8000/history`, {
+                    headers: {
+                        'Authorization': `Bearer ${session.access_token}`
+                    }
+                });
                 const data = await response.json();
                 if (data.queries) {
                     setHistory(data.queries);
@@ -33,7 +37,8 @@ export function ProfilePage() {
         };
 
         fetchHistory();
-    }, [user]);
+    }, [user, session]);
+
 
     if (loading) {
         return (

@@ -121,7 +121,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             <p className="text-xs text-slate-400 mb-4 leading-relaxed">
                                 Upload your own PDF documents. We'll automatically index and chunk them so the AI can use them as primary sources in your research.
                             </p>
-                            <FileUpload userId="demo-user" />
+                            <FileUpload />
+
                         </div>
                     </div>
 

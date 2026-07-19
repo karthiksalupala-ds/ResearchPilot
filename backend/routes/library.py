@@ -1,15 +1,16 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from retrieval.pdf_processor import processor
 from retrieval.embeddings import generate_embedding
 import database
 from config import get_settings
 from services.audio_service import audio_service
+from services.auth import get_current_user
 
 router = APIRouter()
 settings = get_settings()
 
 @router.post("/upload")
-async def upload_pdf(user_id: str, file: UploadFile = File(...)):
+async def upload_pdf(file: UploadFile = File(...), current_user = Depends(get_current_user)):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files allowed.")
     
@@ -32,10 +33,11 @@ async def upload_pdf(user_id: str, file: UploadFile = File(...)):
             title=f"{file.filename} (Chunk {i})",
             content=chunk,
             embedding=embedding,
-            user_id=user_id
+            user_id=current_user.id
         )
     
     return {
         "message": f"Successfully indexed {len(chunks)} chunks from {file.filename}.",
         "audio_path": audio_path
     }
+
