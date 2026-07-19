@@ -22,7 +22,10 @@ class AudioService:
             api_key = settings.openai_api_key
             if not api_key:
                 print("[AudioService] Warning: OPENAI_API_KEY not found in settings.")
+<<<<<<< HEAD
                 return None
+=======
+>>>>>>> 03eb864c4c23455f7be527dddc9067537236dbf7
             self._client = OpenAI(api_key=api_key)
         return self._client
 

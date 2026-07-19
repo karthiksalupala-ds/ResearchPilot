@@ -55,8 +55,11 @@ export interface ResearchRequest {
     query: string;
     max_papers?: number;
     sources?: string[];
+<<<<<<< HEAD
     research_mode?: 'academic' | 'journalistic' | 'skeptic';
     depth?: 'standard' | 'comprehensive';
+=======
+>>>>>>> 03eb864c4c23455f7be527dddc9067537236dbf7
     user_id?: string;
 }
 
