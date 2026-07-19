@@ -21,7 +21,7 @@
   }
 
   body {
-    @apply bg-surface-950 text-slate-100 font-sans antialiased;
+    @apply bg-surface-900 text-slate-100 font-sans antialiased;
     background: radial-gradient(circle 800px at 50% -100px, rgba(99, 102, 241, 0.12), transparent),
       #030712;
     min-height: 100vh;
