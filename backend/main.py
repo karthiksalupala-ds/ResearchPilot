@@ -2,7 +2,12 @@
 """
 ResearchPilot – FastAPI Application Entry Point
 """
+import sys
 import os
+
+# Add the backend directory to sys.path to allow relative imports on Vercel
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
