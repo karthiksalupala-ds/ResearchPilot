@@ -5,11 +5,14 @@ import { FlaskConical, Zap, BookOpen, Shield, Search, ArrowRight, Star, Sparkles
 import SearchBar from '../components/SearchBar';
 import ReasoningPipeline from '../components/ReasoningPipeline';
 import ResultsPanel from '../components/ResultsPanel';
+import DebateArena from '../components/DebateArena';
+import KnowledgeGraph from '../components/KnowledgeGraph';
 import { analyzeResearch } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import type { AnalysisResult, PipelineStep } from '../lib/types';
 import { cn } from '../lib/utils';
+
 
 const FEATURES = [
     {
@@ -241,6 +244,12 @@ export default function HomePage() {
                             <ReasoningPipeline steps={steps} isActive={isLoading} />
                         )}
 
+                        {/* Interactive Debate Arena */}
+                        <DebateArena steps={steps} result={result} />
+
+                        {/* Interactive Citation Graph Map */}
+                        <KnowledgeGraph result={result} />
+
                         {/* Bottom: Results Panel */}
                         <div className="min-h-[400px]">
                             {isLoading && !result && (
@@ -254,6 +263,7 @@ export default function HomePage() {
                         </div>
                     </motion.div>
                 )}
+
 
                 {/* Stats - Disappear during search */}
                 <AnimatePresence>
