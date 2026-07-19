@@ -457,3 +457,69 @@
   box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
   border-color: rgba(16, 185, 129, 0.4);
 }
+
+/* --- Custom Lamp Login Styles --- */
+:root {
+  --lamp-matte: #e8e2d9;
+  --lamp-shade: #f5f0e6;
+  --lamp-base: #d1ccc2;
+  --lamp-glow-color: rgba(255, 214, 110, 0.3);
+  --lamp-accent-color: #d4a373;
+}
+
+.lamp-shade-path {
+  fill: var(--lamp-shade);
+  transition: fill 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lamp-shade-on {
+  fill: #fff !important;
+  filter: drop-shadow(0 0 30px rgba(255, 255, 200, 0.5));
+}
+
+.lamp-base-rect {
+  fill: var(--lamp-base);
+}
+
+.inner-glow-ellipse {
+  fill: #ffdb8a;
+  opacity: 0;
+  filter: blur(15px);
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.inner-glow-on {
+  opacity: 0.6 !important;
+}
+
+.cord-line-svg {
+  stroke: #555;
+  stroke-width: 2;
+}
+
+.cord-bead-svg {
+  fill: var(--lamp-accent-color);
+}
+
+.login-form-lamp {
+  transition: all 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.login-btn-lamp {
+  background: linear-gradient(
+    135deg,
+    #bf953f,
+    #fcf6ba,
+    #b38728,
+    #fcf6ba,
+    #aa771c
+  );
+  color: #121417;
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+.login-btn-lamp:hover {
+  transform: scale(1.02);
+  background: var(--lamp-shade);
+}

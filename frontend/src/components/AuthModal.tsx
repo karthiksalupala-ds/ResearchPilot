@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { X, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { motion, useMotionValue, useTransform, useAnimation } from 'framer-motion';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -13,6 +14,14 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isLampOn, setIsLampOn] = useState(false);
+
+    const cordY = useMotionValue(0);
+    // Visual feedback: line extension
+    const lineY2 = useTransform(cordY, (value) => 180 + value);
+    const beadY = useTransform(cordY, (value) => 190 + value);
+
+    const controls = useAnimation();
 
     if (!isOpen) return null;
 
@@ -28,7 +37,6 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                     password,
                 });
                 if (error) throw error;
-                // Automatically log them in or show a message to verify email
                 onClose();
             } else {
                 const { error } = await supabase.auth.signInWithPassword({
@@ -45,25 +53,128 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         }
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-            <div className="relative w-full max-w-sm overflow-hidden bg-surface-900 border border-white/10 rounded-2xl shadow-2xl animate-slide-up">
+    const handleDragEnd = async () => {
+        const currentY = cordY.get();
+        if (currentY > 25) {
+            // Toggle light state
+            setIsLampOn(prev => !prev);
+            // Play a click sound or simple feedback
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+        }
+        // Snap back cord
+        controls.start({ y: 0, transition: { type: 'spring', stiffness: 300, damping: 15 } });
+    };
 
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-white/5 bg-white/5">
-                    <h2 className="text-lg font-semibold text-white">
-                        {isSignUp ? 'Create an Account' : 'Welcome Back'}
-                    </h2>
-                    <button
-                        onClick={onClose}
-                        className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md transition-all duration-700">
+            {/* Custom glowing background behind the modal */}
+            <div 
+                className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ease-in-out ${
+                    isLampOn ? 'opacity-100' : 'opacity-0'
+                }`}
+                style={{
+                    background: 'radial-gradient(circle 450px at 50% 35%, rgba(251, 191, 36, 0.15), transparent 70%)'
+                }}
+            />
+
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className={`relative w-full max-w-md overflow-hidden border rounded-3xl shadow-2xl transition-all duration-700 ${
+                    isLampOn 
+                        ? 'bg-amber-950/20 border-amber-500/30 shadow-amber-500/10' 
+                        : 'bg-slate-950/70 border-white/10 shadow-black'
+                }`}
+            >
+                {/* Close Button */}
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 z-10 p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-colors"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+
+                {/* Interactive Lamp Section */}
+                <div className="relative flex justify-center pt-8 pb-4 h-52 bg-gradient-to-b from-black/40 to-transparent">
+                    {/* Radial Glow under the lamp shade */}
+                    <div 
+                        className={`absolute top-28 w-48 h-48 rounded-full blur-3xl pointer-events-none transition-all duration-700 scale-150 ${
+                            isLampOn ? 'bg-amber-400/40 opacity-100' : 'bg-transparent opacity-0'
+                        }`}
+                    />
+
+                    <svg className="w-48 h-48 drop-shadow-xl" viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg">
+                        {/* Glow Ellipse */}
+                        <ellipse 
+                            className={`inner-glow-ellipse ${isLampOn ? 'inner-glow-on' : ''}`} 
+                            cx="100" 
+                            cy="90" 
+                            rx="50" 
+                            ry="20" 
+                        />
+
+                        {/* Lamp Base Stem */}
+                        <rect className="lamp-base-rect" x="97" y="0" width="6" height="85" />
+
+                        {/* Pull Cord */}
+                        <motion.g
+                            drag="y"
+                            dragConstraints={{ top: 0, bottom: 40 }}
+                            dragElastic={0.1}
+                            style={{ y: cordY }}
+                            onDragEnd={handleDragEnd}
+                            animate={controls}
+                            className="cursor-pointer"
+                            onClick={() => {
+                                setIsLampOn(!isLampOn);
+                            }}
+                        >
+                            {/* SVG line and bead that follow movement */}
+                            <motion.line 
+                                className="cord-line-svg" 
+                                x1="125" 
+                                y1="85" 
+                                x2="125" 
+                                y2={lineY2} 
+                            />
+                            <motion.circle 
+                                className="cord-bead-svg" 
+                                cx="125" 
+                                cy={beadY} 
+                                r="7" 
+                            />
+                            {/* Hit area */}
+                            <circle cx="125" cy="190" r="25" fill="transparent" />
+                        </motion.g>
+
+                        {/* Lamp Shade */}
+                        <path 
+                            className={`lamp-shade-path ${isLampOn ? 'lamp-shade-on' : ''} cursor-pointer`} 
+                            onClick={() => setIsLampOn(!isLampOn)}
+                            d="M40 85 C 40 35, 160 35, 160 85 C 160 98, 40 98, 40 85 Z" 
+                        />
+                    </svg>
+
+                    <div className="absolute bottom-2 text-center">
+                        <span className={`text-xs font-semibold uppercase tracking-widest transition-colors duration-500 ${
+                            isLampOn ? 'text-amber-400' : 'text-slate-500'
+                        }`}>
+                            {isLampOn ? 'Light On • Authentication Active' : 'Pull Cord to Toggle Light'}
+                        </span>
+                    </div>
                 </div>
 
-                {/* Body */}
-                <div className="p-6">
+                {/* Login Form Container - fades in / slides up when lamp is active */}
+                <div className={`p-8 login-form-lamp ${
+                    isLampOn ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-8 pointer-events-none'
+                }`}>
+                    <h2 className="text-2xl font-bold text-center mb-6 text-white tracking-tight">
+                        {isSignUp ? 'Create an Account' : 'Welcome Back'}
+                    </h2>
+
                     {error && (
                         <div className="flex items-start gap-2 p-3 mb-4 text-sm text-red-200 bg-red-900/40 border border-red-500/20 rounded-xl">
                             <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
@@ -75,12 +186,14 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                         <div>
                             <label className="block mb-1.5 text-sm font-medium text-slate-300">Email Address</label>
                             <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                                <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-500 ${
+                                    isLampOn ? 'text-amber-400/70' : 'text-slate-500'
+                                }`} />
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
+                                    className="w-full pl-9 pr-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all duration-500"
                                     placeholder="you@example.com"
                                     required
                                 />
@@ -90,12 +203,14 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                         <div>
                             <label className="block mb-1.5 text-sm font-medium text-slate-300">Password</label>
                             <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                                <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-500 ${
+                                    isLampOn ? 'text-amber-400/70' : 'text-slate-500'
+                                }`} />
                                 <input
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
+                                    className="w-full pl-9 pr-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all duration-500"
                                     placeholder="••••••••"
                                     required
                                     minLength={6}
@@ -106,11 +221,12 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full flex justify-center items-center py-2.5 px-4 bg-brand-600 hover:bg-brand-500 shadow-lg shadow-brand-500/20 border border-brand-500/50 hover:border-brand-400 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full flex justify-center items-center py-3 px-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed login-btn-lamp"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isSignUp ? 'Sign Up' : 'Sign In')}
                         </button>
                     </form>
+
 
                     <div className="mt-6 text-center">
                         <button
@@ -119,13 +235,16 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                                 setIsSignUp(!isSignUp);
                                 setError(null);
                             }}
-                            className="text-sm text-slate-400 hover:text-white transition-colors"
+                            className={`text-sm transition-colors duration-500 ${
+                                isLampOn ? 'text-amber-400/80 hover:text-white' : 'text-slate-400 hover:text-white'
+                            }`}
                         >
                             {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
                         </button>
                     </div>
                 </div>
-            </div>
+            </motion.div>
         </div>
     );
 }
+
