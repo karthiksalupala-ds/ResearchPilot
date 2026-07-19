@@ -74,23 +74,19 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             <h3 className="text-xs font-bold uppercase tracking-widest">Intelligence Engine</h3>
                         </div>
                         <div className="grid grid-cols-1 gap-3">
-                            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:bg-white/10 transition-colors">
+                            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between opacity-90">
                                 <div>
                                     <p className="text-sm font-bold text-white">Multi-LLM Debate</p>
-                                    <p className="text-[11px] text-slate-500">Run 5 agents concurrently for balanced views</p>
+                                    <p className="text-[11px] text-slate-500">Always enabled for Pro mode</p>
                                 </div>
-                                <div className="w-10 h-5 bg-brand-600 rounded-full relative flex items-center px-1">
-                                    <div className="w-3.5 h-3.5 bg-white rounded-full ml-auto shadow-sm" />
-                                </div>
+                                <span className="text-[9px] uppercase tracking-wide text-emerald-500/80 font-semibold">On</span>
                             </div>
-                            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between group hover:bg-white/10 transition-colors">
+                            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between opacity-90">
                                 <div>
                                     <p className="text-sm font-bold text-white">Intelligent Fallback</p>
-                                    <p className="text-[11px] text-slate-500">Auto-switch providers on API failure</p>
+                                    <p className="text-[11px] text-slate-500">Always enabled — auto-switches providers</p>
                                 </div>
-                                <div className="w-10 h-5 bg-brand-600 rounded-full relative flex items-center px-1">
-                                    <div className="w-3.5 h-3.5 bg-white rounded-full ml-auto shadow-sm" />
-                                </div>
+                                <span className="text-[9px] uppercase tracking-wide text-emerald-500/80 font-semibold">On</span>
                             </div>
                         </div>
                     </div>
@@ -105,7 +101,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             {['ArXiv', 'PubMed', 'Semantic Scholar', 'Google Search'].map(source => (
                                 <div key={source} className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between">
                                     <span className="text-xs font-semibold text-slate-300">{source}</span>
-                                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="text-[9px] text-emerald-500/80 uppercase tracking-wide">Active</span>
                                 </div>
                             ))}
                         </div>
@@ -142,9 +138,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                     className="accent-brand-500"
                                 />
                             </div>
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between opacity-60">
                                 <span className="text-sm text-slate-300">Show Internal Reasoning</span>
-                                <input type="checkbox" checked={true} className="accent-brand-500" readOnly />
+                                <span className="text-[9px] uppercase tracking-wide text-slate-500">Coming soon</span>
                             </div>
                         </div>
                     </div>

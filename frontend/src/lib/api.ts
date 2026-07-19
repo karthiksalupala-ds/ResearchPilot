@@ -2,13 +2,30 @@
 
 import type { AnalysisResult, PipelineStep, ResearchRequest } from './types';
 
-const API_BASE = 
-    import.meta.env.VITE_API_BASE_URL !== undefined && import.meta.env.VITE_API_BASE_URL !== ''
-        ? import.meta.env.VITE_API_BASE_URL
-        : (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-            ? 'http://localhost:8000'
-            : '');
+export function getApiBase(): string {
+    if (import.meta.env.VITE_API_BASE_URL !== undefined && import.meta.env.VITE_API_BASE_URL !== '') {
+        return import.meta.env.VITE_API_BASE_URL;
+    }
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+        return 'http://localhost:8000';
+    }
+    return '';
+}
 
+const API_BASE = getApiBase();
+
+/** Strip stack traces / raw exception dumps for judge-facing errors. */
+export function friendlyError(message: string): string {
+    const cleaned = message
+        .replace(/Traceback[\s\S]*$/i, '')
+        .replace(/\s+at\s+\S+.*/g, '')
+        .replace(/Server error \d+:\s*/i, '')
+        .trim();
+    if (!cleaned || cleaned.length > 280) {
+        return 'Something went wrong while researching. Please try again.';
+    }
+    return cleaned;
+}
 
 export type OnStep = (step: PipelineStep) => void;
 export type OnResult = (result: AnalysisResult) => void;
@@ -39,13 +56,13 @@ export function analyzeResearch(
 
             if (!response.ok) {
                 const errText = await response.text();
-                onError(`Server error ${response.status}: ${errText}`);
+                onError(friendlyError(`Server error ${response.status}: ${errText}`));
                 onDone();
                 return;
             }
 
             const reader = response.body?.getReader();
-            if (!reader) { onError('No response stream.'); onDone(); return; }
+            if (!reader) { onError('No response stream. Please try again.'); onDone(); return; }
 
             const decoder = new TextDecoder();
             let buffer = '';
@@ -72,7 +89,9 @@ export function analyzeResearch(
                             onStep({ ...stepData, timestamp: Date.now() });
                         }
                         if (event.event === 'result') onResult(event.data as AnalysisResult);
-                        if (event.event === 'error') onError((event.data as { message: string }).message);
+                        if (event.event === 'error') {
+                            onError(friendlyError((event.data as { message: string }).message || 'Research failed'));
+                        }
                         if (event.event === 'done') onDone();
                     } catch {
                         // skip malformed event
@@ -82,7 +101,7 @@ export function analyzeResearch(
             onDone();
         } catch (err: unknown) {
             if (err instanceof Error && err.name === 'AbortError') return;
-            onError(err instanceof Error ? err.message : 'Unknown error occurred');
+            onError(friendlyError(err instanceof Error ? err.message : 'Unknown error occurred'));
             onDone();
         }
     })();
@@ -90,9 +109,20 @@ export function analyzeResearch(
     return () => controller.abort();
 }
 
-/** Fetch recent query history */
+/** Fetch authenticated research history for the signed-in user */
+export async function fetchResearchHistory(accessToken: string, limit = 20): Promise<{ queries: unknown[] }> {
+    const res = await fetch(`${API_BASE}/research/history?limit=${limit}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) {
+        throw new Error(friendlyError(`Could not load history (${res.status})`));
+    }
+    return res.json();
+}
+
+/** Fetch recent query history (unauthenticated public list fallback) */
 export async function fetchQueryHistory(user_id?: string): Promise<unknown[]> {
-    const url = user_id ? `${API_BASE}/research/history?user_id=${user_id}` : `${API_BASE}/queries/`;
+    const url = user_id ? `${API_BASE}/queries/?user_id=${user_id}` : `${API_BASE}/queries/`;
     const res = await fetch(url);
     if (!res.ok) return [];
     return res.json();

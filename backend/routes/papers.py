@@ -6,7 +6,8 @@ from typing import List, Optional
 import database
 from models import ResearchPaper
 
-router = APIRouter(prefix="/api/papers", tags=["papers"])
+# Mounted at /papers in main.py → routes are /papers/ and /papers/{paper_id}
+router = APIRouter(tags=["papers"])
 
 
 @router.get("/", response_model=List[dict])

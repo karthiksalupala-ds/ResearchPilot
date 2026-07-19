@@ -2,7 +2,7 @@ import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { AnalysisResult } from '../lib/types';
 import PaperCard from './PaperCard';
-import EvidenceStrengthMeter from './EvidenceStrengthMeter';
+import EvidenceStrengthMeter, { hasDisplayableEvidence } from './EvidenceStrengthMeter';
 import {
     HelpCircle, Map, BookOpen, ThumbsUp, ThumbsDown,
     Zap, AlertTriangle, Shield, Search, Lightbulb, FileText, Sparkles,
@@ -304,9 +304,11 @@ export default function ResultsPanel({ result }: ResultsPanelProps) {
             <div className="lg:col-span-1 space-y-6">
                 
                 {/* Evidence strength panel */}
+                {hasDisplayableEvidence(result.evidence_analysis) && (
                 <div className="glass-premium rounded-3xl p-6 border border-white/5 relative overflow-hidden">
                     <EvidenceStrengthMeter score={result.evidence_analysis} />
                 </div>
+                )}
 
                 {/* Document Sources List */}
                 <div className="glass-premium rounded-3xl p-6 border border-white/5 space-y-4">

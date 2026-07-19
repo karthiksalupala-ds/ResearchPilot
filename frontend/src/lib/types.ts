@@ -17,7 +17,9 @@ export interface EvidenceScore {
     paper_count: number;
     source_diversity: number;
     consistency_score: number;
-    label: 'Strong' | 'Moderate' | 'Limited' | 'Insufficient';
+    label: 'Strong' | 'Moderate' | 'Limited' | 'Insufficient' | 'Cached' | string;
+    /** 1-2 sentence evidence summary from the analyzer / orchestrator */
+    explanation?: string;
 }
 
 export interface AnalysisResult {

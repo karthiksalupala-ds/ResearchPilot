@@ -2,6 +2,8 @@ import type { EvidenceScore } from '../lib/types';
 
 interface Props {
     score: EvidenceScore;
+    /** When true, show waiting copy instead of a low/empty score */
+    isLoading?: boolean;
 }
 
 const LABEL_CONFIG = {
@@ -9,6 +11,7 @@ const LABEL_CONFIG = {
     Moderate: { color: 'text-brand-400', bar: 'from-brand-500 to-purple-500', bg: 'bg-brand-500/10 border-brand-500/30' },
     Limited: { color: 'text-amber-400', bar: 'from-amber-500 to-orange-400', bg: 'bg-amber-500/10 border-amber-500/30' },
     Insufficient: { color: 'text-red-400', bar: 'from-red-500 to-rose-400', bg: 'bg-red-500/10 border-red-500/30' },
+    Cached: { color: 'text-brand-400', bar: 'from-brand-500 to-purple-500', bg: 'bg-brand-500/10 border-brand-500/30' },
 };
 
 function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {
@@ -28,21 +31,38 @@ function ScoreBar({ label, value, color }: { label: string; value: number; color
     );
 }
 
-export default function EvidenceStrengthMeter({ score }: Props) {
-    const cfg = LABEL_CONFIG[score.label] ?? LABEL_CONFIG.Moderate;
+/** Only render numeric evidence after real papers exist. */
+export function hasDisplayableEvidence(score?: EvidenceScore | null): boolean {
+    if (!score) return false;
+    if (score.paper_count <= 0) return false;
+    if (score.label === 'Insufficient' || score.overall_score < 2) return false;
+    return true;
+}
+
+export default function EvidenceStrengthMeter({ score, isLoading }: Props) {
+    if (isLoading || !hasDisplayableEvidence(score)) {
+        return (
+            <div className="glass rounded-2xl p-5 space-y-3">
+                <h4 className="text-sm font-semibold text-slate-200">Evidence Strength</h4>
+                <p className="text-sm text-slate-400">
+                    {isLoading ? 'Searching academic databases...' : 'Waiting for evidence...'}
+                </p>
+            </div>
+        );
+    }
+
+    const cfg = LABEL_CONFIG[score.label as keyof typeof LABEL_CONFIG] ?? LABEL_CONFIG.Moderate;
     const pct = (score.overall_score / 10) * 100;
 
-    // Circumference of the circle
     const R = 40;
     const C = 2 * Math.PI * R;
     const offset = C - (pct / 100) * C;
 
     return (
         <div className="glass rounded-2xl p-5 space-y-5">
-            <h4 className="text-sm font-semibold text-slate-200">📊 Evidence Strength Analysis</h4>
+            <h4 className="text-sm font-semibold text-slate-200">Evidence Strength Analysis</h4>
 
             <div className="flex items-center gap-6">
-                {/* Circular gauge */}
                 <div className="relative w-24 h-24 flex-shrink-0">
                     <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r={R} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="10" />
@@ -70,18 +90,17 @@ export default function EvidenceStrengthMeter({ score }: Props) {
                     </div>
                 </div>
 
-                {/* Label + meta */}
                 <div className="flex-1 space-y-2">
                     <div className={`inline-flex items-center px-3 py-1 rounded-full border text-sm font-semibold ${cfg.bg} ${cfg.color}`}>
                         {score.label} Evidence
                     </div>
-                    <p className="text-xs text-slate-500">
-                        Based on <span className="text-slate-300 font-medium">{score.paper_count} papers</span> retrieved from arXiv, Semantic Scholar, and PubMed.
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                        {score.explanation?.trim() ||
+                            `Based on ${score.paper_count} papers retrieved from academic sources.`}
                     </p>
                 </div>
             </div>
 
-            {/* Sub-scores */}
             <div className="space-y-3 pt-1">
                 <ScoreBar label="Source Diversity" value={score.source_diversity} color={cfg.bar} />
                 <ScoreBar label="Finding Consistency" value={score.consistency_score} color={cfg.bar} />

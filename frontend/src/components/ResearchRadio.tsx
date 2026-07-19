@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, SkipForward, Mic, Volume2, Radio, Sparkles, Loader2, Quote } from 'lucide-react';
+import { Play, Pause, SkipForward, Mic, Radio, Sparkles, Loader2, Quote } from 'lucide-react';
+import { getApiBase } from '../lib/api';
 
 interface ScriptTurn {
     speaker: string;
@@ -16,6 +17,7 @@ export default function ResearchRadio({ context }: ResearchRadioProps) {
     const [currentIndex, setCurrentIndex] = useState(-1);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
     const [isListening, setIsListening] = useState(false);
@@ -30,11 +32,10 @@ export default function ResearchRadio({ context }: ResearchRadioProps) {
 
         const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
         if (!SpeechRecognition) {
-            alert('Voice interaction is not supported in this browser.');
+            setError('Voice interaction is not supported in this browser.');
             return;
         }
 
-        // Stop radio playback while listening
         setIsPlaying(false);
         if (audioRef.current) audioRef.current.pause();
 
@@ -49,22 +50,22 @@ export default function ResearchRadio({ context }: ResearchRadioProps) {
         recognition.onresult = async (event: any) => {
             const transcript = event.results[0][0].transcript;
             setIsLoading(true);
+            setError(null);
             try {
-                const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-                const res = await fetch(`${apiBase}/research/radio/interact`, {
+                const res = await fetch(`${getApiBase()}/research/radio/interact`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: transcript, context }),
                 });
+                if (!res.ok) throw new Error('interact failed');
                 const data = await res.json();
 
-                // Add the response to the script or play it immediately
                 const responseTurn = { speaker: 'Alloy', text: data.response, audio_url: data.audio_url };
                 setScript(prev => [...prev.slice(0, currentIndex + 1), responseTurn, ...prev.slice(currentIndex + 1)]);
                 setCurrentIndex(prev => prev + 1);
                 setIsPlaying(true);
-            } catch (err) {
-                console.error('Interruption failed', err);
+            } catch {
+                setError('Could not process your interruption. Please try again.');
             } finally {
                 setIsLoading(false);
             }
@@ -76,19 +77,24 @@ export default function ResearchRadio({ context }: ResearchRadioProps) {
 
     const startRadio = async () => {
         setIsLoading(true);
+        setError(null);
         try {
-            const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-            const res = await fetch(`${apiBase}/research/radio/start`, {
+            const res = await fetch(`${getApiBase()}/research/radio/start`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ context }),
             });
+            if (!res.ok) throw new Error('start failed');
             const data = await res.json();
-            setScript(data.script);
+            const turns = data.script?.length ? data.script : [
+                { speaker: 'Alloy', text: "Let's discuss the key findings from this research." },
+                { speaker: 'Shimmer', text: "I'm ready to dive into the evidence." },
+            ];
+            setScript(turns);
             setCurrentIndex(0);
             setIsPlaying(true);
-        } catch (err) {
-            console.error('Radio start failed', err);
+        } catch {
+            setError('Research Radio is temporarily unavailable. Please try again.');
         } finally {
             setIsLoading(false);
         }
@@ -98,8 +104,7 @@ export default function ResearchRadio({ context }: ResearchRadioProps) {
         if (currentIndex >= 0 && currentIndex < script.length && isPlaying) {
             const turn = script[currentIndex];
             if (turn.audio_url) {
-                const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-                audioRef.current = new Audio(`${apiBase}${turn.audio_url}`);
+                audioRef.current = new Audio(`${getApiBase()}${turn.audio_url}`);
                 audioRef.current.play();
                 audioRef.current.onended = () => {
                     if (currentIndex < script.length - 1) {
@@ -120,7 +125,6 @@ export default function ResearchRadio({ context }: ResearchRadioProps) {
 
     return (
         <div className="flex flex-col h-[500px] glass rounded-3xl overflow-hidden animate-scale-in">
-            {/* Radio Header */}
             <div className="p-6 border-b border-white/10 bg-brand-500/5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-brand-500/10 rounded-xl border border-brand-500/20">
@@ -133,16 +137,20 @@ export default function ResearchRadio({ context }: ResearchRadioProps) {
                 </div>
                 {currentIndex >= 0 && (
                     <div className="flex items-center gap-1">
-                        <div className={`w-1 h-3 rounded-full bg-brand-500 animate-bounce [animation-delay:-0.3s]`} />
-                        <div className={`w-1 h-5 rounded-full bg-brand-400 animate-bounce [animation-delay:-0.1s]`} />
-                        <div className={`w-1 h-2 rounded-full bg-brand-300 animate-bounce [animation-delay:-0.2s]`} />
+                        <div className="w-1 h-3 rounded-full bg-brand-500 animate-bounce [animation-delay:-0.3s]" />
+                        <div className="w-1 h-5 rounded-full bg-brand-400 animate-bounce [animation-delay:-0.1s]" />
+                        <div className="w-1 h-2 rounded-full bg-brand-300 animate-bounce [animation-delay:-0.2s]" />
                     </div>
                 )}
             </div>
 
-            {/* Script Area */}
+            {error && (
+                <div className="px-6 py-2 text-xs text-amber-300 bg-amber-500/10 border-b border-amber-500/20">
+                    {error}
+                </div>
+            )}
+
             <div className="flex-1 p-8 flex flex-col items-center justify-center relative overflow-hidden">
-                {/* Background Visualizer Mocks */}
                 <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
                     <div className={`w-64 h-64 border-2 border-brand-500 rounded-full transition-all duration-1000 ${isPlaying ? 'scale-150 opacity-0' : 'scale-100'}`} />
                     <div className={`w-48 h-48 border-2 border-brand-400 rounded-full transition-all duration-700 ${isPlaying ? 'scale-150 opacity-0' : 'scale-100'}`} />
@@ -180,23 +188,21 @@ export default function ResearchRadio({ context }: ResearchRadioProps) {
                             <div className="relative">
                                 <Quote className="absolute -top-6 -left-6 w-8 h-8 text-white/5" />
                                 <p className="text-xl md:text-2xl font-medium text-white leading-tight tracking-tight italic">
-                                    "{script[currentIndex]?.text}"
+                                    &ldquo;{script[currentIndex]?.text}&rdquo;
                                 </p>
                             </div>
                         </div>
 
-                        {/* Progress */}
                         <div className="max-w-md mx-auto h-1 bg-white/5 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-brand-500 transition-all duration-500"
-                                style={{ width: `${((currentIndex + 1) / script.length) * 100}%` }}
+                                style={{ width: `${((currentIndex + 1) / Math.max(script.length, 1)) * 100}%` }}
                             />
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Audio Controls */}
             {currentIndex >= 0 && (
                 <div className="p-8 bg-black/20 backdrop-blur-md border-t border-white/5">
                     <div className="flex items-center justify-between">

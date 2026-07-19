@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Brain, ShieldAlert, CheckCircle2, ChevronRight, User, Loader2 } from 'lucide-react';
 import type { AnalysisResult, PipelineStep } from '../lib/types';
+import { reportMarkdownComponents } from './ExecutiveReport';
 
 interface DebateArenaProps {
     steps: Record<string, PipelineStep>;
@@ -16,6 +19,13 @@ interface Debater {
     avatarBg: string;
     glowColor: string;
     description: string;
+}
+
+interface ArgumentBlock {
+    mainClaim: string;
+    evidence: string;
+    confidence: string;
+    raw: string;
 }
 
 const DEBATERS: Debater[] = [
@@ -57,6 +67,138 @@ const DEBATERS: Debater[] = [
     }
 ];
 
+function extractDebaterSection(blob: string, which: 'pro1' | 'pro2' | 'con1' | 'con2'): string {
+    if (!blob) return '';
+
+    const patterns: Record<string, RegExp[]> = {
+        pro1: [
+            /###\s*Pro\s*1[\s\S]*?(?=###\s*Pro\s*2|$)/i,
+            /Pro\s*1[\s\S]*?(?=###\s*Pro\s*2|Pro\s*2|$)/i,
+        ],
+        pro2: [
+            /###\s*Pro\s*2[\s\S]*$/i,
+            /Pro\s*2[\s\S]*$/i,
+        ],
+        con1: [
+            /###\s*Con\s*1[\s\S]*?(?=###\s*Con\s*2|$)/i,
+            /Con\s*1[\s\S]*?(?=###\s*Con\s*2|Con\s*2|$)/i,
+        ],
+        con2: [
+            /###\s*Con\s*2[\s\S]*$/i,
+            /Con\s*2[\s\S]*$/i,
+        ],
+    };
+
+    for (const re of patterns[which]) {
+        const m = blob.match(re);
+        if (m?.[0]?.trim()) return m[0].trim();
+    }
+
+    if (which === 'pro1') return blob.split(/###\s*Pro\s*2/i)[0] || blob;
+    if (which === 'pro2') return blob.split(/###\s*Pro\s*2/i)[1] || '';
+    if (which === 'con1') return blob.split(/###\s*Con\s*2/i)[0] || blob;
+    return blob.split(/###\s*Con\s*2/i)[1] || '';
+}
+
+function parseArgumentBlocks(text: string): ArgumentBlock[] {
+    const cleaned = text
+        .replace(/^\s*###[^\n]*\n?/, '')
+        .replace(/\*\*\[[^\]]*\]\*\*\s*/g, '')
+        .trim();
+
+    if (!cleaned) return [];
+
+    const chunks = cleaned
+        .split(/(?=\*\*Main claim:\*\*)|(?=^\d+[\.\)]\s)/im)
+        .map(c => c.trim())
+        .filter(Boolean);
+
+    const blocks: ArgumentBlock[] = [];
+    for (const chunk of chunks) {
+        const main = chunk.match(/\*\*Main claim:\*\*\s*([\s\S]*?)(?=\*\*Evidence used:\*\*|$)/i)?.[1]?.trim() || '';
+        const evidence = chunk.match(/\*\*Evidence used:\*\*\s*([\s\S]*?)(?=\*\*Confidence level:\*\*|$)/i)?.[1]?.trim() || '';
+        const confidence = chunk.match(/\*\*Confidence level:\*\*\s*([\s\S]*?)$/i)?.[1]?.trim() || '';
+
+        if (main || evidence || confidence) {
+            blocks.push({ mainClaim: main, evidence, confidence, raw: chunk });
+        } else if (chunk.length > 25 && !chunk.includes('Debate skipped')) {
+            blocks.push({ mainClaim: '', evidence: '', confidence: '', raw: chunk });
+        }
+    }
+
+    return blocks;
+}
+
+function ArgumentRenderer({ text, isRunning }: { text: string; isRunning: boolean }) {
+    const blocks = useMemo(() => parseArgumentBlocks(text), [text]);
+
+    if (isRunning) {
+        return (
+            <div className="flex items-center gap-2 text-slate-500 italic py-4">
+                <Loader2 className="w-4 h-4 animate-spin text-brand-400" />
+                <span>Building expert arguments...</span>
+            </div>
+        );
+    }
+
+    if (!text || text.includes('Debate skipped') || text.length < 20) {
+        return <p className="text-slate-500 italic py-4">Building expert arguments...</p>;
+    }
+
+    if (blocks.length === 0) {
+        return (
+            <div className="text-sm leading-relaxed text-slate-200">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={reportMarkdownComponents}>
+                    {text}
+                </ReactMarkdown>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4 overflow-y-auto max-h-[420px] pr-1">
+            {blocks.map((block, i) => (
+                <div key={i} className="rounded-2xl border border-white/10 bg-black/20 p-4 space-y-3">
+                    {block.mainClaim ? (
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Main claim</p>
+                            <div className="text-sm text-slate-100 leading-relaxed">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={reportMarkdownComponents}>
+                                    {block.mainClaim}
+                                </ReactMarkdown>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-sm text-slate-200">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={reportMarkdownComponents}>
+                                {block.raw}
+                            </ReactMarkdown>
+                        </div>
+                    )}
+                    {block.evidence && (
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Evidence used</p>
+                            <div className="text-sm text-slate-300 leading-relaxed">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={reportMarkdownComponents}>
+                                    {block.evidence}
+                                </ReactMarkdown>
+                            </div>
+                        </div>
+                    )}
+                    {block.confidence && (
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Confidence level</p>
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white/5 border border-white/10 text-slate-200">
+                                {block.confidence.replace(/\n/g, ' ')}
+                            </span>
+                        </div>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+}
+
 export default function DebateArena({ steps, result }: DebateArenaProps) {
     const debateStep = steps['debate'];
     const isDebateRunning = debateStep?.status === 'running';
@@ -64,10 +206,18 @@ export default function DebateArena({ steps, result }: DebateArenaProps) {
     const [selectedDebater, setSelectedDebater] = useState<string>('pro1');
     const [proPercent, setProPercent] = useState(50);
 
-    // Dynamic Sentiment calculations
+    const isFastPath =
+        !!result && (
+            (result.supporting_arguments || '').includes('Debate skipped') ||
+            (result.research_strategy || '').toLowerCase().includes('fast-path')
+        );
+
+    const shouldShow =
+        isDebateRunning ||
+        (isDebateDone && !!result && !isFastPath);
+
     useEffect(() => {
         if (isDebateRunning) {
-            // Live animate sentiment while processing
             const interval = setInterval(() => {
                 setProPercent(prev => {
                     const delta = (Math.random() - 0.5) * 10;
@@ -75,33 +225,24 @@ export default function DebateArena({ steps, result }: DebateArenaProps) {
                 });
             }, 600);
             return () => clearInterval(interval);
-        } else if (isDebateDone && result) {
-            // Set fixed based on evidence score
+        } else if (isDebateDone && result && !isFastPath) {
             const score = result.evidence_analysis?.overall_score || 5;
-            setProPercent(score * 10);
+            setProPercent(Math.max(35, Math.min(65, score * 10)));
         }
-    }, [isDebateRunning, isDebateDone, result]);
+    }, [isDebateRunning, isDebateDone, result, isFastPath]);
 
-    if (!isDebateRunning && !isDebateDone) return null;
+    if (!shouldShow) return null;
 
-    // Extract arguments from results
     const getArgument = (id: string) => {
-        if (!result) return 'Synthesizing arguments...';
-        if (id === 'pro1') {
-            return result.supporting_arguments?.split('### Pro 2')[0] || 'Analyzing benefits...';
-        }
-        if (id === 'pro2') {
-            return result.supporting_arguments?.split('### Pro 2')[1] || 'Analyzing systemic outcomes...';
-        }
-        if (id === 'con1') {
-            return result.counterarguments?.split('### Con 2')[0] || 'Analyzing direct risks...';
-        }
-        return result.counterarguments?.split('### Con 2')[1] || 'Analyzing systemic concerns...';
+        if (!result) return '';
+        if (id === 'pro1') return extractDebaterSection(result.supporting_arguments || '', 'pro1');
+        if (id === 'pro2') return extractDebaterSection(result.supporting_arguments || '', 'pro2');
+        if (id === 'con1') return extractDebaterSection(result.counterarguments || '', 'con1');
+        return extractDebaterSection(result.counterarguments || '', 'con2');
     };
 
     return (
         <div className="glass rounded-3xl p-6 md:p-8 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.4)] animate-fade-in max-w-5xl mx-auto mb-12">
-            {/* Header */}
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/5">
                 <div className="flex items-center gap-3">
                     <div className="p-2 rounded-xl bg-brand-500/10 text-brand-400">
@@ -114,8 +255,8 @@ export default function DebateArena({ steps, result }: DebateArenaProps) {
                 </div>
                 <div className="flex items-center gap-2">
                     <span className={`text-xs px-3 py-1 rounded-full border ${
-                        isDebateRunning 
-                            ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 animate-pulse' 
+                        isDebateRunning
+                            ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 animate-pulse'
                             : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
                     }`}>
                         {isDebateRunning ? 'Debating...' : 'Debate Complete'}
@@ -123,7 +264,6 @@ export default function DebateArena({ steps, result }: DebateArenaProps) {
                 </div>
             </div>
 
-            {/* Live Sentiment Meter */}
             <div className="mb-10 space-y-3">
                 <div className="flex justify-between text-xs font-bold uppercase tracking-wider">
                     <span className="text-emerald-400 flex items-center gap-1.5">
@@ -136,10 +276,8 @@ export default function DebateArena({ steps, result }: DebateArenaProps) {
                     </span>
                 </div>
                 <div className="h-4 w-full bg-black/40 rounded-full overflow-hidden p-[2px] border border-white/5 relative">
-                    {/* Centered line */}
                     <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-white/20 z-10" />
-                    
-                    <motion.div 
+                    <motion.div
                         animate={{ width: `${proPercent}%` }}
                         transition={{ type: 'spring', stiffness: 80, damping: 15 }}
                         className="h-full bg-gradient-to-r from-emerald-600 to-teal-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.3)]"
@@ -147,10 +285,7 @@ export default function DebateArena({ steps, result }: DebateArenaProps) {
                 </div>
             </div>
 
-            {/* Arena Floor */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                
-                {/* Agent Selector Grid (Left / Columns) */}
                 <div className="lg:col-span-1 grid grid-cols-2 lg:grid-cols-1 gap-3">
                     {DEBATERS.map((debater) => {
                         const isSelected = selectedDebater === debater.id;
@@ -161,8 +296,8 @@ export default function DebateArena({ steps, result }: DebateArenaProps) {
                                 whileTap={{ scale: 0.98 }}
                                 onClick={() => setSelectedDebater(debater.id)}
                                 className={`flex items-center gap-3 p-4 rounded-2xl border text-left transition-all ${
-                                    isSelected 
-                                        ? `bg-white/5 border-brand-500 shadow-lg ${debater.glowColor}` 
+                                    isSelected
+                                        ? `bg-white/5 border-brand-500 shadow-lg ${debater.glowColor}`
                                         : 'bg-black/20 border-white/5 hover:bg-white/[0.02]'
                                 }`}
                             >
@@ -179,13 +314,12 @@ export default function DebateArena({ steps, result }: DebateArenaProps) {
                     })}
                 </div>
 
-                {/* Speech Bubble / Output (Right / Full width) */}
                 <div className="lg:col-span-2 h-full">
                     <AnimatePresence mode="wait">
                         {DEBATERS.map((debater) => {
                             if (selectedDebater !== debater.id) return null;
                             const argument = getArgument(debater.id);
-                            
+
                             return (
                                 <motion.div
                                     key={debater.id}
@@ -198,8 +332,8 @@ export default function DebateArena({ steps, result }: DebateArenaProps) {
                                     <div className="relative p-6 rounded-3xl bg-white/5 border border-white/10 shadow-xl flex-1 flex flex-col min-h-[220px]">
                                         <div className="flex items-center gap-2 mb-4">
                                             <span className={`text-[10px] uppercase font-bold tracking-widest px-2.5 py-1 rounded-full ${
-                                                debater.role === 'pro' 
-                                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                                debater.role === 'pro'
+                                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                                     : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                                             }`}>
                                                 {debater.role === 'pro' ? 'Pro Side' : 'Con Side'}
@@ -209,16 +343,7 @@ export default function DebateArena({ steps, result }: DebateArenaProps) {
                                             </span>
                                         </div>
 
-                                        <div className="text-sm leading-relaxed text-slate-200 prose prose-invert max-w-none flex-1 overflow-y-auto whitespace-pre-wrap">
-                                            {isDebateRunning ? (
-                                                <div className="flex items-center gap-2 text-slate-500 italic py-4">
-                                                    <Loader2 className="w-4 h-4 animate-spin text-brand-400" />
-                                                    <span>Agent debating and analyzing papers...</span>
-                                                </div>
-                                            ) : (
-                                                argument
-                                            )}
-                                        </div>
+                                        <ArgumentRenderer text={argument} isRunning={isDebateRunning} />
                                     </div>
                                 </motion.div>
                             );

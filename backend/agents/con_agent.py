@@ -11,13 +11,19 @@ class ConAgent(BaseAgent):
 Your focus is to present the strongest counterarguments, limitations, and opposing evidence against a research position, specifically emphasizing:
 {focus}
 
-Using the provided research papers:
-- Identify methodological weaknesses and confounders related to your focus
-- Highlight conflicting findings or null results
-- Point out generalizability issues
-- Acknowledge what the evidence fails to establish
+Write 2–4 numbered counterarguments. EACH argument MUST use this exact structure:
 
-Write 3-5 well-structured counterarguments. Format as numbered points."""
+**Main claim:** <one clear counterclaim or limitation>
+**Evidence used:** <what the papers show or fail to establish; include citations>
+**Confidence level:** <High|Medium|Low> — <brief reason>
+
+CITATION FORMAT (mandatory for every major claim):
+`[Source · Year](URL)` — example: `[PubMed · 2021](https://...)`
+
+Rules:
+- Highlight methodological weaknesses, confounders, null results, and generalizability limits.
+- Only cite papers from the provided evidence list (use their URL when available).
+- Keep each field to 1–3 sentences."""
         super().__init__(system_prompt=system_prompt, temperature=0.4, provider=provider)
         self.name = name
 
@@ -26,16 +32,20 @@ Write 3-5 well-structured counterarguments. Format as numbered points."""
         prompt = (
             f"Research Question: {refined_question}\n\n"
             f"Available Research Evidence:\n{context}\n\n"
-            f"Generate counterarguments and limitations:"
+            f"Generate counterarguments in the required Main claim / Evidence used / Confidence level format:"
         )
-        return await self._call_llm(prompt, max_tokens=800)
+        return await self._call_llm(prompt, max_tokens=1000)
 
     def _build_context(self, papers: List[ResearchPaper]) -> str:
         snippets = []
         for i, p in enumerate(papers[:5], 1):
             authors = ", ".join(p.authors[:2]) if p.authors else "Unknown"
-            year = f"({p.year})" if p.year else ""
+            year = p.year or "n/a"
+            url = p.url or "#"
             snippets.append(
-                f"[{i}] {p.title} — {authors} {year} [{p.source}]\n{p.abstract[:250]}"
+                f"[{i}] {p.title} — {authors} ({year}) [{p.source}]\n"
+                f"URL: {url}\n"
+                f"Cite as: [{p.source} · {year}]({url})\n"
+                f"{p.abstract[:250]}"
             )
-        return "\n\n".join(snippets)
+        return "\n\n".join(snippets) if snippets else "No papers available."

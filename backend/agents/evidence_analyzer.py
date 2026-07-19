@@ -1,7 +1,7 @@
 """
 Evidence Analyzer – scores the strength of evidence from retrieved papers.
 """
-from typing import List, Tuple
+from typing import List
 from agents.base_agent import BaseAgent
 from models import ResearchPaper, EvidenceScore
 
@@ -11,12 +11,18 @@ Evaluate research evidence on three dimensions:
 2. Consistency (0-10): How consistent are findings across studies?
 3. Overall Strength (0-10): Holistic evidence strength
 
+Also write a short EXPLANATION: a 1-2 sentence paragraph summarizing:
+- number of papers
+- source diversity
+- agreement vs disagreement across findings
+- overall confidence
+
 Respond in EXACTLY this format (no extra text):
 SOURCE_DIVERSITY: <score>
 CONSISTENCY: <score>
 OVERALL: <score>
 LABEL: <Strong|Moderate|Limited|Insufficient>
-SUMMARY: <one-sentence explanation>"""
+EXPLANATION: <1-2 sentence paragraph>"""
 
 
 class EvidenceAnalyzerAgent(BaseAgent):
@@ -40,7 +46,7 @@ class EvidenceAnalyzerAgent(BaseAgent):
             f"Counterarguments:\n{con_args[:500]}\n\n"
             f"Evaluate the evidence strength:"
         )
-        raw = await self._call_llm(prompt, max_tokens=300)
+        raw, _ = await self._call_llm(prompt, max_tokens=400)
         return self._parse_score(raw, papers)
 
     def _summarize_papers(self, papers: List[ResearchPaper]) -> str:
@@ -52,14 +58,19 @@ class EvidenceAnalyzerAgent(BaseAgent):
     def _source_breakdown(self, papers: List[ResearchPaper]) -> str:
         from collections import Counter
         counts = Counter(p.source for p in papers)
-        return ", ".join(f"{k}: {v}" for k, v in counts.items())
+        return ", ".join(f"{k}: {v}" for k, v in counts.items()) or "none"
 
     def _parse_score(self, raw: str, papers: List[ResearchPaper]) -> EvidenceScore:
         scores = {}
+        explanation = ""
         for line in raw.splitlines():
-            for key in ["SOURCE_DIVERSITY", "CONSISTENCY", "OVERALL", "LABEL"]:
-                if line.startswith(key + ":"):
+            for key in ["SOURCE_DIVERSITY", "CONSISTENCY", "OVERALL", "LABEL", "EXPLANATION", "SUMMARY"]:
+                if line.upper().startswith(key + ":"):
                     scores[key] = line.split(":", 1)[1].strip()
+
+        explanation = scores.get("EXPLANATION") or scores.get("SUMMARY") or ""
+        if not explanation:
+            explanation = self._fallback_explanation(papers, "Moderate")
 
         def safe_float(key: str, default: float = 5.0) -> float:
             try:
@@ -77,4 +88,15 @@ class EvidenceAnalyzerAgent(BaseAgent):
             source_diversity=safe_float("SOURCE_DIVERSITY"),
             consistency_score=safe_float("CONSISTENCY"),
             label=label,
+            explanation=explanation,
+        )
+
+    @staticmethod
+    def _fallback_explanation(papers: List[ResearchPaper], label: str) -> str:
+        sources = sorted({p.source for p in papers}) if papers else []
+        source_txt = ", ".join(sources) if sources else "no sources"
+        n = len(papers)
+        return (
+            f"Based on {n} paper{'s' if n != 1 else ''} across {source_txt}, "
+            f"evidence strength is rated {label.lower()}, with mixed agreement expected until deeper synthesis."
         )

@@ -11,13 +11,19 @@ class ProAgent(BaseAgent):
 Your focus is to present the strongest evidence-based case FOR a given research position, specifically emphasizing:
 {focus}
 
-Using the provided research papers:
-- Identify compelling supporting findings related to your focus
-- Reference specific papers by title or findings
-- Highlight patterns and strong evidence
-- Be rigorous but persuasive
+Write 2–4 numbered arguments. EACH argument MUST use this exact structure:
 
-Write 3-5 well-structured supporting arguments. Format as numbered points."""
+**Main claim:** <one clear claim>
+**Evidence used:** <what the papers show; include citations>
+**Confidence level:** <High|Medium|Low> — <brief reason>
+
+CITATION FORMAT (mandatory for every major claim):
+`[Source · Year](URL)` — example: `[arXiv · 2022](https://arxiv.org/abs/...)`
+
+Rules:
+- Only cite papers from the provided evidence list (use their URL when available).
+- Prefer concrete findings over vague assertions.
+- Keep each field to 1–3 sentences."""
         super().__init__(system_prompt=system_prompt, temperature=0.4, provider=provider)
         self.name = name
 
@@ -26,16 +32,20 @@ Write 3-5 well-structured supporting arguments. Format as numbered points."""
         prompt = (
             f"Research Question: {refined_question}\n\n"
             f"Available Research Evidence:\n{context}\n\n"
-            f"Generate supporting arguments:"
+            f"Generate supporting arguments in the required Main claim / Evidence used / Confidence level format:"
         )
-        return await self._call_llm(prompt, max_tokens=800)
+        return await self._call_llm(prompt, max_tokens=1000)
 
     def _build_context(self, papers: List[ResearchPaper]) -> str:
         snippets = []
         for i, p in enumerate(papers[:5], 1):
             authors = ", ".join(p.authors[:2]) if p.authors else "Unknown"
-            year = f"({p.year})" if p.year else ""
+            year = p.year or "n/a"
+            url = p.url or "#"
             snippets.append(
-                f"[{i}] {p.title} — {authors} {year} [{p.source}]\n{p.abstract[:250]}"
+                f"[{i}] {p.title} — {authors} ({year}) [{p.source}]\n"
+                f"URL: {url}\n"
+                f"Cite as: [{p.source} · {year}]({url})\n"
+                f"{p.abstract[:250]}"
             )
-        return "\n\n".join(snippets)
+        return "\n\n".join(snippets) if snippets else "No papers available."

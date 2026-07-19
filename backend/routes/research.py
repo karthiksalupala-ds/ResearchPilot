@@ -18,8 +18,12 @@ async def _sse_generator(request: ResearchRequest):
         async for event in orchestrator.run(request):
             payload = json.dumps(event, default=str)
             yield f"data: {payload}\n\n"
-    except Exception as e:
-        error_payload = json.dumps({"event": "error", "data": {"message": str(e)}})
+    except Exception:
+        # Never stream stack traces to the client
+        error_payload = json.dumps({
+            "event": "error",
+            "data": {"message": "Research hit an unexpected issue. Please try again."},
+        })
         yield f"data: {error_payload}\n\n"
     finally:
         yield "data: {\"event\": \"done\", \"data\": {}}\n\n"
@@ -62,8 +66,11 @@ async def research_chat(request: ChatRequest):
     try:
         response = await orchestrator.chat(request)
         return {"response": response}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Chat is temporarily unavailable. Please try again.",
+        )
 
 @router.post("/radio/start")
 async def start_radio(request: dict):
@@ -75,24 +82,35 @@ async def start_radio(request: dict):
         # Hydrate script with audio URLs (for the first 3 turns as a start)
         for turn in script[:3]:
             voice = "lead" if turn["speaker"] == "Alloy" else "support"
-            turn["audio_url"] = await audio_service.generate_tts(turn["text"], voice)
+            try:
+                turn["audio_url"] = await audio_service.generate_tts(turn["text"], voice)
+            except Exception:
+                turn["audio_url"] = None
             
         return {"script": script}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        # Always return a playable fallback script for demo reliability
+        return {
+            "script": [
+                {"speaker": "Alloy", "text": "Let's walk through the key findings from this research.", "audio_url": None},
+                {"speaker": "Shimmer", "text": "I'm ready — start with the strongest evidence.", "audio_url": None},
+            ]
+        }
 
 @router.post("/radio/interact")
 async def interact_radio(request: dict):
     """Interrupt the radio with a question and get a response."""
-    # Logic similar to chat but specifically for the radio context
     try:
         user_msg = request.get("message", "")
         context = request.get("context", "")
-        # Get response from moderator
         response = await orchestrator.chat(type('obj', (object,), {'context': context, 'message': user_msg, 'history': []}))
-        
-        # Generate audio for the response
-        audio_url = await audio_service.generate_tts(response, "lead")
+        try:
+            audio_url = await audio_service.generate_tts(response, "lead")
+        except Exception:
+            audio_url = None
         return {"response": response, "audio_url": audio_url}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        return {
+            "response": "I couldn't process that interruption just now. Please try again.",
+            "audio_url": None,
+        }

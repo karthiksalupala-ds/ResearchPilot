@@ -10,7 +10,7 @@ export default function App() {
     return (
         <AuthProvider>
             <SettingsProvider>
-                <BrowserRouter>
+                <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                     <div className="min-h-screen">
                         <Navbar />
                         <Routes>

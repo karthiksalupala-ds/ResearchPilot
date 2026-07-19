@@ -20,6 +20,17 @@ export default function Navbar() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    useEffect(() => {
+        const openSettings = () => setIsSettingsModalOpen(true);
+        const openAuth = () => setIsAuthModalOpen(true);
+        window.addEventListener('researchpilot:open-settings', openSettings);
+        window.addEventListener('researchpilot:open-auth', openAuth);
+        return () => {
+            window.removeEventListener('researchpilot:open-settings', openSettings);
+            window.removeEventListener('researchpilot:open-auth', openAuth);
+        };
+    }, []);
+
     const handleSignOut = async () => {
         await signOut();
         navigate('/');

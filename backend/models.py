@@ -52,6 +52,10 @@ class EvidenceScore(BaseModel):
     source_diversity: float
     consistency_score: float
     label: str  # Strong / Moderate / Limited / Insufficient
+    explanation: str = Field(
+        default="",
+        description="1-2 sentence summary of paper count, diversity, agreement, and confidence",
+    )
 
 
 class AnalysisResult(BaseModel):
