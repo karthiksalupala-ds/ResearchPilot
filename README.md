@@ -89,15 +89,6 @@ Powered by **Groq LLaMA-3.3 70B**, ResearchPilot delivers near real-time researc
 
 ---
 
-### 💎 Perplexity-Style Research UI
-A modern, dark glassmorphism interface with:
-- Animated reasoning pipeline with live step indicators
-- Evidence cards with source attribution
-- Pro vs Con debate view
-- Clean executive summary output
-
----
-
 ## 🧠 Agentic Architecture
 
 ### 1️⃣ Query Refiner Agent
