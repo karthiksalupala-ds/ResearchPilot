@@ -7,7 +7,10 @@ from pathlib import Path
 class AudioService:
     def __init__(self):
         self._client = None
-        self.output_dir = Path("static/audio")
+        if "VERCEL" in os.environ:
+            self.output_dir = Path("/tmp/static/audio")
+        else:
+            self.output_dir = Path("static/audio")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.voice_map = {
             "lead": "alloy",

@@ -44,8 +44,9 @@ app.add_middleware(
 
 
 # Static Files (for generated audio)
-os.makedirs("static", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+static_dir = "/tmp/static" if "VERCEL" in os.environ else "static"
+os.makedirs(static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Routers
 app.include_router(research.router, prefix="/research", tags=["Research"])
