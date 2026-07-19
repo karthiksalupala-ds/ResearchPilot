@@ -49,6 +49,7 @@ app.include_router(library.router, prefix="/library", tags=["Library"])
 
 
 @app.get("/", tags=["health"])
+@app.head("/", tags=["health"])
 async def root():
     return {
         "service": "ResearchPilot API",
@@ -61,5 +62,7 @@ async def root():
 
 
 @app.get("/health", tags=["health"])
+@app.head("/health", tags=["health"])
 async def health():
     return {"status": "ok"}
+
