@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, ShieldAlert, CheckCircle2, ChevronRight, User } from 'lucide-react';
+import { Brain, ShieldAlert, CheckCircle2, ChevronRight, User, Loader2 } from 'lucide-react';
 import type { AnalysisResult, PipelineStep } from '../lib/types';
 
 interface DebateArenaProps {

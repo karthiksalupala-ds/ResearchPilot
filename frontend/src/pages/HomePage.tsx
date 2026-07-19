@@ -7,11 +7,13 @@ import ReasoningPipeline from '../components/ReasoningPipeline';
 import ResultsPanel from '../components/ResultsPanel';
 import DebateArena from '../components/DebateArena';
 import KnowledgeGraph from '../components/KnowledgeGraph';
+import ParticleBackground from '../components/ParticleBackground';
 import { analyzeResearch } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import type { AnalysisResult, PipelineStep } from '../lib/types';
 import { cn } from '../lib/utils';
+
 
 
 const FEATURES = [
@@ -143,6 +145,8 @@ export default function HomePage() {
         <div className="relative min-h-screen pt-24 overflow-hidden">
             {/* Ambient Background */}
             <div className="mesh-gradient" />
+            <ParticleBackground />
+
 
             {/* Hero Section */}
             <section className="relative z-10 max-w-7xl mx-auto px-6 pb-20">
