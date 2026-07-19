@@ -135,7 +135,6 @@ class ResearchOrchestrator:
 
         # ── RESEARCH MODE ADJUSTMENT ──────────────────────────
         mode = request.research_mode.lower()
-<<<<<<< HEAD
         # Save original agent state to prevent singleton mutation across requests
         _orig_mod_temp = self.moderator.temperature
         _orig_mod_prompt = self.moderator.system_prompt
@@ -147,14 +146,6 @@ class ResearchOrchestrator:
         elif mode == "skeptic":
             self.critic.temperature = 0.5
             self.critic.system_prompt = _orig_crit_prompt + "\nBe extremely critical of the evidence quality. Identify potential biases and industry funding in paper sources."
-=======
-        if mode == "journalistic":
-            self.moderator.temperature = 0.7
-            self.moderator.system_prompt += "\nFocus on narrative flow, readability, and real-world implications. Use engaging analogies."
-        elif mode == "skeptic":
-            self.critic.temperature = 0.5
-            self.critic.system_prompt += "\nBe extremely critical of the evidence quality. Identify potential biases and industry funding in paper sources."
->>>>>>> 03eb864c4c23455f7be527dddc9067537236dbf7
         
         # ── STEP 0: Cache Check ────────────────────────────────
         yield self._step_event("cache_lookup", "running", "⚡ Checking neural cache for existing analysis...")
@@ -213,14 +204,6 @@ class ResearchOrchestrator:
         key_evidence = self._summarize_evidence(papers)
 
         # ── STEP 3 & 4: Insight Generation (Fast-Path vs Deep Debate) ──────────
-<<<<<<< HEAD
-=======
-        dummy_score = EvidenceScore(
-            overall_score=8.5, paper_count=len(papers),
-            source_diversity=8.0, consistency_score=7.0, label="Strong"
-        )
-        
->>>>>>> 03eb864c4c23455f7be527dddc9067537236dbf7
         is_comprehensive = request.depth.lower() == "comprehensive"
 
         if is_comprehensive:
@@ -260,11 +243,8 @@ class ResearchOrchestrator:
             supporting_arguments = "*(Debate skipped for standard speed. Fast synthesis active.)*"
             counterarguments = "*(Debate skipped for standard speed. Fast synthesis active.)*"
             pro2_args, con1_args, con2_args = "", "", ""
-<<<<<<< HEAD
             # Define _out variables to prevent NameError in downstream code
             pro1_out, pro2_out, con1_out, con2_out = pro1_args, "", "", ""
-=======
->>>>>>> 03eb864c4c23455f7be527dddc9067537236dbf7
             
             # Direct synthesis without debate
             synthesis_task = self.moderator.moderate(
@@ -329,7 +309,6 @@ class ResearchOrchestrator:
 
         query_id = await _store_results()
 
-<<<<<<< HEAD
         # ── Restore agent state (prevent singleton mutation) ──────
         self.moderator.temperature = _orig_mod_temp
         self.moderator.system_prompt = _orig_mod_prompt
@@ -340,34 +319,16 @@ class ResearchOrchestrator:
         evidence_score = self._compute_evidence_score(papers)
         strategy = ("Debate Mode: 4 AI agents (2 Pro, 2 Con) analyzed the evidence and debated the topic, followed by a Synthesizer AI which created the final response."
                      if is_comprehensive else "Fast-path Mode: Evidence was synthesized directly from sources for speed.")
-=======
-        # ── Final Result Event ───────────────────────────────────
-        dummy_score = EvidenceScore(
-            overall_score=8.5,
-            paper_count=len(papers),
-            source_diversity=8.0,
-            consistency_score=7.0,
-            label="Strong"
-        )
->>>>>>> 03eb864c4c23455f7be527dddc9067537236dbf7
 
         result = AnalysisResult(
             query_id=query_id,
             original_query=original_query,
             refined_question=refined_question,
-<<<<<<< HEAD
             research_strategy=strategy,
             key_evidence=key_evidence,
             supporting_arguments=supporting_arguments,
             counterarguments=counterarguments,
             evidence_analysis=evidence_score,
-=======
-            research_strategy="Debate Mode: 4 AI agents (2 Pro, 2 Con) analyzed the evidence and debated the topic, followed by a Synthesizer AI which created the final response.",
-            key_evidence=key_evidence,
-            supporting_arguments=f"### Pro 1: Direct Impacts\n{pro1_out}\n\n### Pro 2: Systemic Impacts\n{pro2_out}",
-            counterarguments=f"### Con 1: Direct Risks\n{con1_out}\n\n### Con 2: Systemic Risks\n{con2_out}",
-            evidence_analysis=dummy_score,
->>>>>>> 03eb864c4c23455f7be527dddc9067537236dbf7
             contradictions=contradictions,
             critical_evaluation=critical_evaluation,
             research_gaps=research_gaps,
@@ -539,7 +500,6 @@ class ResearchOrchestrator:
         return "\n".join(lines)
 
     @staticmethod
-<<<<<<< HEAD
     def _compute_evidence_score(papers) -> EvidenceScore:
         """Compute a dynamic evidence score based on actual retrieved papers."""
         paper_count = len(papers)
@@ -567,8 +527,6 @@ class ResearchOrchestrator:
         )
 
     @staticmethod
-=======
->>>>>>> 03eb864c4c23455f7be527dddc9067537236dbf7
     def _step_event(step: str, status: str, message: str, data: dict = None, provider: str = None) -> dict:
         return {
             "event": "step",

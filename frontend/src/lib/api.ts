@@ -86,11 +86,7 @@ export function analyzeResearch(
 
 /** Fetch recent query history */
 export async function fetchQueryHistory(user_id?: string): Promise<unknown[]> {
-<<<<<<< HEAD
     const url = user_id ? `${API_BASE}/research/history?user_id=${user_id}` : `${API_BASE}/queries/`;
-=======
-    const url = user_id ? `${API_BASE}/history?user_id=${user_id}` : `${API_BASE}/queries/`;
->>>>>>> 03eb864c4c23455f7be527dddc9067537236dbf7
     const res = await fetch(url);
     if (!res.ok) return [];
     return res.json();

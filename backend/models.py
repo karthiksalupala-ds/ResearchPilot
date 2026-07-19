@@ -10,10 +10,7 @@ class ResearchRequest(BaseModel):
     max_papers: int = Field(default=10, ge=3, le=30)
     sources: List[str] = Field(default=["arxiv", "semantic_scholar", "pubmed"])
     research_mode: str = Field(default="academic", description="academic | journalistic | skeptic")
-<<<<<<< HEAD
     depth: str = Field(default="standard", description="standard | comprehensive")
-=======
->>>>>>> 03eb864c4c23455f7be527dddc9067537236dbf7
     user_id: Optional[str] = Field(default=None, description="Optional Supabase user ID")
 
 class ChatRequest(BaseModel):

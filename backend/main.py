@@ -1,10 +1,7 @@
 """
 ResearchPilot – FastAPI Application Entry Point
 """
-<<<<<<< HEAD
 import os
-=======
->>>>>>> 03eb864c4c23455f7be527dddc9067537236dbf7
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -33,10 +30,7 @@ app.add_middleware(
 )
 
 # Static Files (for generated audio)
-<<<<<<< HEAD
 os.makedirs("static", exist_ok=True)
-=======
->>>>>>> 03eb864c4c23455f7be527dddc9067537236dbf7
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Routers
