@@ -39,3 +39,4 @@ frontend/.pnp.js
 
 # OS-specific
 .DS_Store
+.vercel

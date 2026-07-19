@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "backend/main.py",
+      "use": "@vercel/python",
+      "config": { "maxDuration": 60 }
+    },
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/research/(.*)",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/papers/(.*)",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/queries/(.*)",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/library/(.*)",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/health",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "frontend/assets/$1"
+    },
+    {
+      "src": "/((?!research|papers|queries|library|health|assets).*)",
+      "dest": "frontend/index.html"
+    }
+  ]
+}

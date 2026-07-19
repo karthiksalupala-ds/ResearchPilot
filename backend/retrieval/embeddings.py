@@ -1,19 +1,8 @@
 import httpx
-from functools import lru_cache
 from typing import List
 from config import get_settings
 
 settings = get_settings()
-
-_hf_model = None
-
-
-def _get_hf_model():
-    global _hf_model
-    if _hf_model is None:
-        from sentence_transformers import SentenceTransformer
-        _hf_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-    return _hf_model
 
 
 async def generate_embedding(text: str) -> List[float]:
@@ -23,12 +12,8 @@ async def generate_embedding(text: str) -> List[float]:
     if provider == "openai" and settings.openai_api_key:
         return await _openai_embedding(text)
     
-    # Try Hugging Face Inference API first (super fast, no model download)
-    try:
-        return await _huggingface_api_embedding(text)
-    except Exception as e:
-        print(f"[Embeddings] HF Inference API failed: {e}. Falling back to local SentenceTransformer...")
-        return _huggingface_local_embedding(text)
+    # Use Hugging Face Inference API directly (API-based, zero dependencies)
+    return await _huggingface_api_embedding(text)
 
 
 async def _huggingface_api_embedding(text: str) -> List[float]:
@@ -38,7 +23,7 @@ async def _huggingface_api_embedding(text: str) -> List[float]:
         headers["Authorization"] = f"Bearer {settings.huggingface_api_token}"
     
     payload = {"inputs": [text]}
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=12.0) as client:
         resp = await client.post(url, json=payload, headers=headers)
         resp.raise_for_status()
     data = resp.json()
@@ -49,12 +34,6 @@ async def _huggingface_api_embedding(text: str) -> List[float]:
             return data[0]
         return data
     raise ValueError("Unexpected response format from HF Inference API")
-
-
-def _huggingface_local_embedding(text: str) -> List[float]:
-    model = _get_hf_model()
-    embedding = model.encode(text, normalize_embeddings=True)
-    return embedding.tolist()
 
 
 async def _openai_embedding(text: str) -> List[float]:
@@ -74,23 +53,17 @@ async def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
         return [await _openai_embedding(t) for t in texts]
     
     # Try HF API in batch
-    try:
-        url = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
-        headers = {}
-        if settings.huggingface_api_token:
-            headers["Authorization"] = f"Bearer {settings.huggingface_api_token}"
-        
-        payload = {"inputs": texts}
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
-        data = resp.json()
-        if isinstance(data, list) and len(data) > 0 and isinstance(data[0], list):
-            return data
-    except Exception as e:
-        print(f"[Embeddings] HF Batch Inference API failed: {e}. Falling back to local SentenceTransformer...")
+    url = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+    headers = {}
+    if settings.huggingface_api_token:
+        headers["Authorization"] = f"Bearer {settings.huggingface_api_token}"
     
-    model = _get_hf_model()
-    embeddings = model.encode(texts, normalize_embeddings=True, batch_size=32)
-    return [e.tolist() for e in embeddings]
-
+    payload = {"inputs": texts}
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        resp = await client.post(url, json=payload, headers=headers)
+        resp.raise_for_status()
+    data = resp.json()
+    if isinstance(data, list) and len(data) > 0 and isinstance(data[0], list):
+        return data
+        
+    raise ValueError("Failed to retrieve batch embeddings from HF Inference API")
