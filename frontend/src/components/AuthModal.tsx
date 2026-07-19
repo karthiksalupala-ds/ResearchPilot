@@ -83,7 +83,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className={`relative w-full max-w-md overflow-hidden border rounded-3xl shadow-2xl transition-all duration-700 ${
+                className={`relative w-full max-w-2xl overflow-hidden border rounded-3xl shadow-2xl transition-all duration-700 ${
                     isLampOn 
                         ? 'bg-amber-950/20 border-amber-500/30 shadow-amber-500/10' 
                         : 'bg-slate-950/70 border-white/10 shadow-black'
@@ -97,80 +97,82 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                     <X className="w-5 h-5" />
                 </button>
 
-                {/* Interactive Lamp Section */}
-                <div className="relative flex justify-center pt-8 pb-4 h-52 bg-gradient-to-b from-black/40 to-transparent">
-                    {/* Radial Glow under the lamp shade */}
-                    <div 
-                        className={`absolute top-28 w-48 h-48 rounded-full blur-3xl pointer-events-none transition-all duration-700 scale-150 ${
-                            isLampOn ? 'bg-amber-400/40 opacity-100' : 'bg-transparent opacity-0'
-                        }`}
-                    />
-
-                    <svg className="w-48 h-48 drop-shadow-xl" viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg">
-                        {/* Glow Ellipse */}
-                        <ellipse 
-                            className={`inner-glow-ellipse ${isLampOn ? 'inner-glow-on' : ''}`} 
-                            cx="100" 
-                            cy="90" 
-                            rx="50" 
-                            ry="20" 
+                <div className="flex flex-col md:flex-row md:items-stretch">
+                    {/* Interactive Lamp Section (Left Side) */}
+                    <div className="relative flex flex-col items-center justify-center p-8 bg-gradient-to-b md:bg-gradient-to-r from-black/50 to-transparent w-full md:w-1/2 min-h-[320px]">
+                        {/* Radial Glow under the lamp shade */}
+                        <div 
+                            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full blur-3xl pointer-events-none transition-all duration-700 scale-150 ${
+                                isLampOn ? 'bg-amber-400/30 opacity-100' : 'bg-transparent opacity-0'
+                            }`}
                         />
 
-                        {/* Lamp Base Stem */}
-                        <rect className="lamp-base-rect" x="97" y="0" width="6" height="85" />
-
-                        {/* Pull Cord */}
-                        <motion.g
-                            drag="y"
-                            dragConstraints={{ top: 0, bottom: 40 }}
-                            dragElastic={0.1}
-                            style={{ y: cordY }}
-                            onDragEnd={handleDragEnd}
-                            animate={controls}
-                            className="cursor-pointer"
-                            onClick={() => {
-                                setIsLampOn(!isLampOn);
-                            }}
-                        >
-                            {/* SVG line and bead that follow movement */}
-                            <motion.line 
-                                className="cord-line-svg" 
-                                x1="125" 
-                                y1="85" 
-                                x2="125" 
-                                y2={lineY2} 
+                        <svg className="w-44 h-44 drop-shadow-xl z-10" viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg">
+                            {/* Glow Ellipse */}
+                            <ellipse 
+                                className={`inner-glow-ellipse ${isLampOn ? 'inner-glow-on' : ''}`} 
+                                cx="100" 
+                                cy="90" 
+                                rx="50" 
+                                ry="20" 
                             />
-                            <motion.circle 
-                                className="cord-bead-svg" 
-                                cx="125" 
-                                cy={beadY} 
-                                r="7" 
+
+                            {/* Lamp Base Stem */}
+                            <rect className="lamp-base-rect" x="97" y="0" width="6" height="85" />
+
+                            {/* Pull Cord */}
+                            <motion.g
+                                drag="y"
+                                dragConstraints={{ top: 0, bottom: 40 }}
+                                dragElastic={0.1}
+                                style={{ y: cordY }}
+                                onDragEnd={handleDragEnd}
+                                animate={controls}
+                                className="cursor-pointer"
+                                onClick={() => {
+                                    setIsLampOn(!isLampOn);
+                                }}
+                            >
+                                {/* SVG line and bead that follow movement */}
+                                <motion.line 
+                                    className="cord-line-svg" 
+                                    x1="125" 
+                                    y1="85" 
+                                    x2="125" 
+                                    y2={lineY2} 
+                                />
+                                <motion.circle 
+                                    className="cord-bead-svg" 
+                                    cx="125" 
+                                    cy={beadY} 
+                                    r="7" 
+                                />
+                                {/* Hit area */}
+                                <circle cx="125" cy="190" r="25" fill="transparent" />
+                            </motion.g>
+
+                            {/* Lamp Shade */}
+                            <path 
+                                className={`lamp-shade-path ${isLampOn ? 'lamp-shade-on' : ''} cursor-pointer`} 
+                                onClick={() => setIsLampOn(!isLampOn)}
+                                d="M40 85 C 40 35, 160 35, 160 85 C 160 98, 40 98, 40 85 Z" 
                             />
-                            {/* Hit area */}
-                            <circle cx="125" cy="190" r="25" fill="transparent" />
-                        </motion.g>
+                        </svg>
 
-                        {/* Lamp Shade */}
-                        <path 
-                            className={`lamp-shade-path ${isLampOn ? 'lamp-shade-on' : ''} cursor-pointer`} 
-                            onClick={() => setIsLampOn(!isLampOn)}
-                            d="M40 85 C 40 35, 160 35, 160 85 C 160 98, 40 98, 40 85 Z" 
-                        />
-                    </svg>
-
-                    <div className="absolute bottom-2 text-center">
-                        <span className={`text-xs font-semibold uppercase tracking-widest transition-colors duration-500 ${
-                            isLampOn ? 'text-amber-400' : 'text-slate-500'
-                        }`}>
-                            {isLampOn ? 'Light On • Authentication Active' : 'Pull Cord to Toggle Light'}
-                        </span>
+                        <div className="text-center mt-4 z-10">
+                            <span className={`text-xs font-semibold uppercase tracking-widest transition-colors duration-500 ${
+                                isLampOn ? 'text-amber-400' : 'text-slate-500'
+                            }`}>
+                                {isLampOn ? 'Light On • Auth Active' : 'Pull Cord to Start'}
+                            </span>
+                        </div>
                     </div>
-                </div>
 
-                {/* Login Form Container - fades in / slides up when lamp is active */}
-                <div className={`p-8 login-form-lamp ${
-                    isLampOn ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-8 pointer-events-none'
-                }`}>
+                    {/* Login Form Container (Right Side) - fades in / slides up when lamp is active */}
+                    <div className={`w-full md:w-1/2 p-8 flex flex-col justify-center login-form-lamp ${
+                        isLampOn ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-8 pointer-events-none'
+                    }`}>
+
                     <h2 className="text-2xl font-bold text-center mb-6 text-white tracking-tight">
                         {isSignUp ? 'Create an Account' : 'Welcome Back'}
                     </h2>
@@ -243,8 +245,11 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                         </button>
                     </div>
                 </div>
+                </div>
             </motion.div>
         </div>
     );
 }
+
+
 
