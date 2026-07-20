@@ -237,7 +237,3 @@ Frontend runs at `http://localhost:5173`.
 ## 👥 Authors
 **Team ResearchPilot** — *Designed for evidence over bias.*
 =======
-## 👥 Authors & Community
-
-**Team Quantum Hackers** — *Designed for evidence over bias.*
->>>>>>> 365db16 (docs: upgrade README with agentic deep research specs, visual cleanups, and icons)
