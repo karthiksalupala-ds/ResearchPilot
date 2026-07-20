@@ -268,3 +268,52 @@ class TestRetrievalTimeout:
         # Should complete without hanging and may include fast arxiv result
         assert isinstance(papers, list)
         assert len(papers) <= research_request.max_papers
+
+
+class TestDeepResearchPipeline:
+    @pytest.mark.asyncio
+    async def test_deep_research_pipeline_success(self, orchestrator, mock_llm_success, sample_papers):
+        from models import ResearchRequest
+        req = ResearchRequest(
+            query="Will AI replace software engineers?",
+            max_papers=5,
+            depth="deep",
+            research_mode="academic",
+        )
+
+        with patch("config.get_settings") as gs:
+            settings = MagicMock()
+            settings.is_demo = False
+            settings.serper_api_key = "fake-key"
+            gs.return_value = settings
+
+            with patch("database.get_cached_analysis", new=AsyncMock(return_value=None)), \
+                 patch("agents.planner.PlannerAgent.plan", new=AsyncMock(return_value=(["AI replacement", "Software jobs"], "mock"))), \
+                 patch("agents.orchestrator.search_arxiv", new=AsyncMock(return_value=sample_papers[:1])), \
+                 patch("agents.orchestrator.search_semantic_scholar", new=AsyncMock(return_value=[])), \
+                 patch("agents.orchestrator.search_pubmed", new=AsyncMock(return_value=[])), \
+                 patch("agents.orchestrator.search_wikipedia", new=AsyncMock(return_value=[])), \
+                 patch("agents.orchestrator.search_google", new=AsyncMock(return_value=[])), \
+                 patch("agents.orchestrator.search_duckduckgo", new=AsyncMock(return_value=[])), \
+                 patch("retrieval.scraper.scrape_url", new=AsyncMock(return_value={
+                     "title": "McKinsey report",
+                     "source": "McKinsey",
+                     "summary": "AI impact details",
+                     "evidence": "Coding speed increased",
+                     "publication_date": "2023-06-25",
+                     "url": "https://mckinsey.com/report"
+                 })):
+                events = []
+                async for event in orchestrator.run(req):
+                    events.append(event)
+
+        # Check result
+        result = next(e for e in events if e["event"] == "result")
+        assert result["data"]["original_query"] == "Will AI replace software engineers?"
+        
+        # Verify steps yielded
+        step_names = [e["data"]["step"] for e in events if e["event"] == "step" and e["data"]["status"] == "done"]
+        assert "query_refinement" in step_names
+        assert "retrieval" in step_names
+        assert "debate" in step_names
+        assert "final_insight" in step_names

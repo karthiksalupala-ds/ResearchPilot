@@ -26,6 +26,8 @@ import database
 from database import similarity_search
 import logging
 from utils.perf import PerfTimer
+import hashlib
+from agents.planner import PlannerAgent
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +154,7 @@ class ResearchOrchestrator:
         # Synthesizer and Critic - use Gemini (high-quality, free) and Groq (fast)
         self.moderator = ModeratorAgent(provider="gemini")
         self.critic = CriticAgent(provider="groq")
+        self.planner = PlannerAgent()
 
     async def run(self, request: ResearchRequest) -> AsyncGenerator[dict, None]:
         """Full pipeline yielding SSE events at each step."""
@@ -238,6 +241,260 @@ class ResearchOrchestrator:
                     papers=[],
                 )
                 yield {"event": "result", "data": result.model_dump(mode="json")}
+                perf.log_total()
+                return
+
+            yield self._step_event("cache_lookup", "done", "✓ Cache search complete — cache miss.")
+
+            if (request.depth or "standard").lower() == "deep":
+                # 1. Planning stage
+                yield self._step_event("query_refinement", "running", "✓ Building research plan...")
+                sub_queries = [original_query]
+                try:
+                    with perf.stage("Query refinement"):
+                        sub_queries_expanded, plan_provider = await self.planner.plan(original_query)
+                        if sub_queries_expanded:
+                            sub_queries = sub_queries_expanded
+                except Exception as e:
+                    logger.error(f"Planning failed: {e}")
+
+                yield self._step_event(
+                    "query_refinement",
+                    "done",
+                    f"✓ Research plan built: targeting {len(sub_queries)} key directions.",
+                    {"refined_question": "Plan: " + ", ".join(sub_queries[:3]) + "..."}
+                )
+
+                # 2. Searching stage
+                yield self._step_event("retrieval", "running", "✓ Searching academic databases...")
+                
+                # Helper to run parallel searches across multiple query sets
+                async def search_single_query(q: str) -> List[ResearchPaper]:
+                    tasks = [
+                        search_arxiv(q, limit=3),
+                        search_semantic_scholar(q, limit=3),
+                        search_pubmed(q, limit=3),
+                        search_wikipedia(q, limit=2)
+                    ]
+                    if settings.serper_api_key:
+                        tasks.append(search_google(q, limit=3))
+                    tasks.append(search_duckduckgo(q, limit=2))
+                    
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    papers = []
+                    for res in results:
+                        if isinstance(res, list):
+                            papers.extend(res)
+                    return papers
+
+                # Concurrently search all sub-queries
+                search_tasks = [search_single_query(q) for q in sub_queries]
+                search_results = await asyncio.gather(*search_tasks, return_exceptions=True)
+                
+                all_papers = []
+                seen_titles = set()
+                for res_list in search_results:
+                    if isinstance(res_list, list):
+                        for paper in res_list:
+                            title_norm = paper.title.lower().strip()
+                            if title_norm not in seen_titles:
+                                all_papers.append(paper)
+                                seen_titles.add(title_norm)
+
+                # 3. Web Reader (Reading top sources)
+                yield self._step_event("retrieval", "running", "✓ Reading web sources...")
+                # Extract top web URLs to scrape (non-PDF external URLs from google/duckduckgo results)
+                web_urls = []
+                for paper in all_papers:
+                    if paper.url and not paper.url.endswith(".pdf") and any(domain in paper.url for domain in (".com", ".org", ".net", ".edu", ".gov")):
+                        if not any(blocked in paper.url for blocked in ("arxiv.org", "ncbi.nlm.nih.gov", "semanticscholar.org", "wikipedia.org")):
+                            web_urls.append(paper.url)
+                
+                # Deduplicate URLs
+                web_urls = list(dict.fromkeys(web_urls))[:4]
+                
+                from retrieval.scraper import scrape_url
+                scrape_tasks = [scrape_url(url) for url in web_urls]
+                scraped_results = await asyncio.gather(*scrape_tasks, return_exceptions=True)
+                
+                for scrap in scraped_results:
+                    if isinstance(scrap, dict) and scrap.get("title"):
+                        title_norm = scrap["title"].lower().strip()
+                        if title_norm not in seen_titles:
+                            paper_id = "web-" + hashlib.md5(scrap["url"].encode()).hexdigest()[:8]
+                            pub_year = None
+                            try:
+                                date_str = scrap.get("publication_date", "unknown")
+                                if date_str != "unknown" and "-" in date_str:
+                                    pub_year = int(date_str.split("-")[0])
+                            except Exception:
+                                pass
+                            
+                            web_paper = ResearchPaper(
+                                id=paper_id,
+                                title=scrap["title"],
+                                abstract=scrap["summary"],
+                                content=scrap["evidence"],
+                                source=scrap.get("source", "Web Reader"),
+                                url=scrap["url"],
+                                authors=[scrap.get("source", "Web Reader")],
+                                year=pub_year,
+                                citations=0
+                            )
+                            all_papers.append(web_paper)
+                            seen_titles.add(title_norm)
+
+                # 4. Conflict detection & recursive research
+                yield self._step_event("retrieval", "running", "✓ Finding conflicting claims...")
+                followup_queries = await self._detect_conflicts_and_get_followups(all_papers)
+                if followup_queries:
+                    yield self._step_event("retrieval", "running", f"✓ Conflict found. Generating follow-up queries: {', '.join(followup_queries[:2])}...")
+                    followup_tasks = [search_single_query(q) for q in followup_queries]
+                    followup_results = await asyncio.gather(*followup_tasks, return_exceptions=True)
+                    for res_list in followup_results:
+                        if isinstance(res_list, list):
+                            for paper in res_list:
+                                title_norm = paper.title.lower().strip()
+                                if title_norm not in seen_titles:
+                                    all_papers.append(paper)
+                                    seen_titles.add(title_norm)
+
+                # 5. Evidence ranking
+                ranked_papers = self._rank_evidence(all_papers)
+                papers_final = ranked_papers[:request.max_papers]
+
+                yield self._step_event(
+                    "retrieval",
+                    "done",
+                    f"✓ Research complete: compiled {len(papers_final)} key sources.",
+                    {"paper_count": len(papers_final)}
+                )
+
+                # Fire-and-forget paper store
+                if papers_final:
+                    asyncio.create_task(store_papers(papers_final))
+
+                key_evidence = self._summarize_evidence(papers_final)
+
+                # 6. Debate stage
+                yield self._step_event("debate", "running", "✓ Running expert debate...", provider="multi")
+                with perf.stage("Debate"):
+                    debate_results = await asyncio.gather(
+                        self.pro1.argue(original_query, papers_final),
+                        self.pro2.argue(original_query, papers_final),
+                        self.con1.argue(original_query, papers_final),
+                        self.con2.argue(original_query, papers_final),
+                        return_exceptions=True,
+                    )
+
+                def _safe_argue(res, fallback: str):
+                    if isinstance(res, Exception):
+                        logger.error(f"Debater failed: {res}")
+                        return fallback, "fallback"
+                    return res
+
+                (pro1_args, pro1_p) = _safe_argue(debate_results[0], "Building expert arguments from available evidence...")
+                (pro2_args, pro2_p) = _safe_argue(debate_results[1], "Building expert arguments from available evidence...")
+                (con1_args, con1_p) = _safe_argue(debate_results[2], "Building expert arguments from available evidence...")
+                (con2_args, con2_p) = _safe_argue(debate_results[3], "Building expert arguments from available evidence...")
+
+                supporting_arguments = (
+                    f"### Pro 1: Direct Impacts\n**[{pro1_p.upper()}]** {pro1_args}\n\n"
+                    f"### Pro 2: Systemic Impacts\n**[{pro2_p.upper()}]** {pro2_args}"
+                )
+                counterarguments = (
+                    f"### Con 1: Direct Risks\n**[{con1_p.upper()}]** {con1_args}\n\n"
+                    f"### Con 2: Systemic Risks\n**[{con2_p.upper()}]** {con2_args}"
+                )
+                yield self._step_event("debate", "done", "✓ Expert debate completed.", provider="multi")
+
+                # 7. Synthesis & Evaluation
+                yield self._step_event("final_insight", "running", "✓ Writing report...", provider="multi")
+                yield self._step_event("evaluation", "running", "✓ Critically evaluating debate quality...", provider="groq")
+
+                with perf.stage("Synthesis"):
+                    synthesis_task = self.moderator.moderate(
+                        original_query, pro1_args, pro2_args, con1_args, con2_args,
+                        system_prompt=mod_prompt, temperature=mod_temp
+                    )
+                    evaluation_task = self.critic.evaluate(
+                        original_query, [pro1_args, pro2_args], [con1_args, con2_args], "pending",
+                        system_prompt=crit_prompt, temperature=crit_temp
+                    )
+                    post_results = await asyncio.gather(
+                        synthesis_task, evaluation_task, return_exceptions=True
+                    )
+
+                final_insight, mod_provider = ("Analysis could not be completed.", "error")
+                if not isinstance(post_results[0], Exception):
+                    final_insight, mod_provider = post_results[0]
+
+                eval_out = ""
+                if not isinstance(post_results[1], Exception):
+                    eval_out = post_results[1]
+                    if isinstance(eval_out, tuple):
+                        eval_out = eval_out[0]
+
+                contradictions = ""
+                critical_evaluation = ""
+                research_gaps = "Further research recommended."
+                if eval_out:
+                    parts = eval_out.split("### Critical Evaluation")
+                    contradictions = parts[0].replace("### Points of Contention", "").strip() if parts else ""
+                    if len(parts) > 1:
+                        eval_and_gaps = parts[1].strip()
+                        if "### Research Gaps & Future Directions" in eval_and_gaps:
+                            gap_parts = eval_and_gaps.split("### Research Gaps & Future Directions")
+                            critical_evaluation = gap_parts[0].strip()
+                            research_gaps = gap_parts[1].strip()
+                        else:
+                            critical_evaluation = eval_and_gaps
+                    else:
+                        critical_evaluation = eval_out
+
+                yield self._step_event("final_insight", "done", "✓ Final report synthesized.", provider=mod_provider)
+                yield self._step_event("evaluation", "done", "✓ Critical evaluation completed.", provider="groq")
+
+                # Finalize citations & results
+                yield self._step_event("final_insight", "running", "✓ Finalizing citations…", provider=mod_provider)
+                with perf.stage("Citation generation"):
+                    evidence_score = self._compute_evidence_score(papers_final)
+
+                result = AnalysisResult(
+                    query_id=None,
+                    original_query=original_query,
+                    refined_question=original_query,
+                    research_strategy="Deep Research Mode: Planner agent decomposed query into sub-queries, executed parallel searches, scraped top results, resolved conflicting claims, ranked evidence, and conducted 4-agent debate.",
+                    key_evidence=key_evidence if papers_final else "Waiting for evidence from academic databases.",
+                    supporting_arguments=supporting_arguments,
+                    counterarguments=counterarguments,
+                    evidence_analysis=evidence_score,
+                    contradictions=contradictions or "No major contradictions identified in the available evidence.",
+                    critical_evaluation=critical_evaluation or "Evaluation limited by available evidence.",
+                    research_gaps=research_gaps or "Further research recommended.",
+                    final_insight=final_insight,
+                    papers=papers_final[:10],
+                )
+
+                yield {"event": "result", "data": result.model_dump(mode="json")}
+
+                async def _store_results():
+                    try:
+                        qid = await database.store_query(original_query, original_query, user_id=request.user_id)
+                        if qid:
+                            await database.store_analysis(qid, {
+                                "supporting_arguments": pro1_args + "\n\n" + pro2_args,
+                                "counterarguments": con1_args + "\n\n" + con2_args,
+                                "evidence_score": evidence_score.overall_score,
+                                "final_insight": final_insight,
+                                "contradictions": contradictions,
+                                "critical_evaluation": critical_evaluation,
+                                "research_gaps": research_gaps,
+                            })
+                    except Exception as e:
+                        logger.error(f"Error storing results: {e}")
+
+                asyncio.create_task(_store_results())
                 perf.log_total()
                 return
 
@@ -448,6 +705,83 @@ class ResearchOrchestrator:
             perf.log_total()
         finally:
             pass
+
+    async def _detect_conflicts_and_get_followups(self, papers: List[ResearchPaper]) -> List[str]:
+        """Use LLM to identify conflicting claims in the papers and return 2-3 follow-up query strings."""
+        if not papers:
+            return []
+        
+        # Summarize key claims in papers
+        evidence_summary = "\n".join([f"- [{p.source}] {p.title}: {p.abstract[:150]}" for p in papers[:6]])
+        prompt = f"""
+        Analyze the following research evidence summaries and identify if any conflicting claims, contradictions, or gaps exist.
+        If conflicts or gaps exist, suggest 2 to 3 specific follow-up search queries to resolve them (e.g., seeking long-term evidence, recent statistics, or counterarguments).
+        
+        Return ONLY a JSON list of strings (the follow-up queries). If no conflicts or gaps are found, return an empty list [].
+        Do not include markdown blocks or explanation text.
+        
+        EVIDENCE:
+        {evidence_summary}
+        """
+        try:
+            # Reusing moderator or any model client
+            response_text, _ = await self.moderator._call_llm(prompt, max_tokens=500)
+            cleaned = response_text.strip()
+            if cleaned.startswith("```"):
+                lines = cleaned.split("\n")
+                if len(lines) > 1:
+                    cleaned = "\n".join(lines[1:])
+            if cleaned.endswith("```"):
+                cleaned = cleaned.rsplit("\n", 1)[0]
+            cleaned = cleaned.strip("`").strip()
+            
+            queries = json.loads(cleaned)
+            if isinstance(queries, list):
+                return [str(q).strip() for q in queries if q][:3]
+        except Exception as e:
+            logger.error(f"Error checking conflicts: {e}")
+        return []
+
+    def _rank_evidence(self, papers: List[ResearchPaper]) -> List[ResearchPaper]:
+        """Rank papers by academic status, recency, citations, and source trust."""
+        import math
+        scored_papers = []
+        
+        # Current year for recency calculations
+        current_year = 2026
+
+        for p in papers:
+            score = 0.0
+            
+            # 1. Academic quality / source weight
+            src = (p.source or "").lower()
+            if src in ("arxiv", "pubmed", "semantic_scholar", "openalex", "core", "crossref", "wikipedia"):
+                score += 3.0
+            else:
+                score += 1.0 # standard web source
+                
+            # 2. Recency
+            if p.year:
+                age = current_year - p.year
+                if age <= 2:
+                    score += 2.0
+                elif age <= 5:
+                    score += 1.0
+                elif age < 0: # future or weird data
+                    score += 0.0
+                else:
+                    score -= min(1.5, age * 0.05) # penalty for very old papers
+                    
+            # 3. Citations
+            if p.citations and p.citations > 0:
+                # Logarithmic citation weight
+                score += min(2.0, math.log10(p.citations) * 0.5)
+                
+            scored_papers.append((score, p))
+            
+        # Sort by score descending
+        scored_papers.sort(key=lambda x: x[0], reverse=True)
+        return [p for _, p in scored_papers]
 
     async def chat(self, request):
         """Handle follow-up research questions using the moderator."""

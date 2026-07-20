@@ -8,7 +8,7 @@ const EXAMPLE_QUERIES = [
     'How effective is CRISPR-Cas9 in treating genetic disorders?',
 ];
 
-export type ResearchDepth = 'standard' | 'comprehensive';
+export type ResearchDepth = 'standard' | 'comprehensive' | 'deep';
 
 interface SearchBarProps {
     onSubmit: (query: string, depth: ResearchDepth) => void;
@@ -19,15 +19,17 @@ export default function SearchBar({ onSubmit, isLoading }: SearchBarProps) {
     const [query, setQuery] = useState('');
     const [focused, setFocused] = useState(false);
     const [isListening, setIsListening] = useState(false);
-    // Pro = comprehensive debate; Quick = standard fast synthesis
-    const [mode, setMode] = useState<'pro' | 'quick'>('pro');
+    // Cycle modes: quick (standard) | pro (comprehensive) | deep (deep research)
+    const [mode, setMode] = useState<'quick' | 'pro' | 'deep'>('pro');
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const recognitionRef = useRef<any>(null);
 
     const handleSubmit = useCallback(() => {
         const trimmed = query.trim();
         if (!trimmed || isLoading) return;
-        const depth: ResearchDepth = mode === 'pro' ? 'comprehensive' : 'standard';
+        let depth: ResearchDepth = 'comprehensive';
+        if (mode === 'quick') depth = 'standard';
+        else if (mode === 'deep') depth = 'deep';
         onSubmit(trimmed, depth);
     }, [query, isLoading, onSubmit, mode]);
 
@@ -109,17 +111,29 @@ export default function SearchBar({ onSubmit, isLoading }: SearchBarProps) {
 
                         <button
                             type="button"
-                            onClick={() => setMode(mode === 'pro' ? 'quick' : 'pro')}
-                            title={mode === 'pro' ? 'Pro: full multi-agent debate' : 'Quick: fast synthesis'}
+                            onClick={() => {
+                                if (mode === 'quick') setMode('pro');
+                                else if (mode === 'pro') setMode('deep');
+                                else setMode('quick');
+                            }}
+                            title={
+                                mode === 'deep' 
+                                    ? 'Deep: human-like agentic deep research' 
+                                    : mode === 'pro' 
+                                        ? 'Pro: full multi-agent debate' 
+                                        : 'Quick: fast synthesis'
+                            }
                             className={cn(
                                 "flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors",
-                                mode === 'pro'
-                                    ? "text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20"
-                                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                                mode === 'deep'
+                                    ? "text-purple-400 bg-purple-500/10 hover:bg-purple-500/20"
+                                    : mode === 'pro'
+                                        ? "text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20"
+                                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
                             )}
                         >
                             <Sparkles className="w-3.5 h-3.5" />
-                            {mode === 'pro' ? 'Pro' : 'Quick'}
+                            {mode === 'deep' ? 'Deep' : mode === 'pro' ? 'Pro' : 'Quick'}
                         </button>
                     </div>
 
