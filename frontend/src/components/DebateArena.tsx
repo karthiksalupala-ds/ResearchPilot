@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Brain, ShieldAlert, CheckCircle2, ChevronRight, User, Loader2 } from 'lucide-react';
 import type { AnalysisResult, PipelineStep } from '../lib/types';
-import { reportMarkdownComponents } from './ExecutiveReport';
+import { reportMarkdownComponents, PapersContext } from './ExecutiveReport';
 
 interface DebateArenaProps {
     steps: Record<string, PipelineStep>;
@@ -242,7 +242,8 @@ function DebateArena({ steps, result }: DebateArenaProps) {
     };
 
     return (
-        <div className="glass rounded-3xl p-6 md:p-8 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.4)] animate-fade-in max-w-5xl mx-auto mb-12">
+        <PapersContext.Provider value={result?.papers || []}>
+            <div className="glass rounded-3xl p-6 md:p-8 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.4)] animate-fade-in max-w-5xl mx-auto mb-12">
             <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/5">
                 <div className="flex items-center gap-3">
                     <div className="p-2 rounded-xl bg-brand-500/10 text-brand-400">
@@ -352,6 +353,7 @@ function DebateArena({ steps, result }: DebateArenaProps) {
                 </div>
             </div>
         </div>
+    </PapersContext.Provider>
     );
 }
 

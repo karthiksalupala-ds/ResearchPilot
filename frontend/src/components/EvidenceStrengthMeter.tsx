@@ -46,7 +46,7 @@ function EvidenceStrengthMeter({ score, isLoading }: Props) {
             <div className="glass rounded-2xl p-5 space-y-3">
                 <h4 className="text-sm font-semibold text-slate-200">Evidence Strength</h4>
                 <p className="text-sm text-slate-400">
-                    {isLoading ? 'Searching academic databases...' : 'Waiting for evidence...'}
+                    {isLoading ? 'Searching academic databases...' : 'Only partial evidence could be retrieved. Some databases were unavailable.'}
                 </p>
             </div>
         );

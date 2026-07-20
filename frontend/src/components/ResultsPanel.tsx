@@ -1,68 +1,45 @@
-import { useState, lazy, Suspense } from 'react';
-import ReactMarkdown from 'react-markdown';
+import React, { useState, lazy, Suspense, useMemo, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, Loader2, BookOpen, Network, Radio, MessageSquare } from 'lucide-react';
 import type { AnalysisResult } from '../lib/types';
-import PaperCard from './PaperCard';
-import EvidenceStrengthMeter, { hasDisplayableEvidence } from './EvidenceStrengthMeter';
-import {
-    HelpCircle, Map, BookOpen, ThumbsUp, ThumbsDown,
-    Zap, AlertTriangle, Shield, Search, Lightbulb, FileText, Sparkles,
-    Download, ClipboardCheck, Share2, MessageSquare, Network, User, Bot, Loader2, Radio, ExternalLink
-} from 'lucide-react';
-import { sendChatMessage } from '../lib/api';
+import { ExecutiveReport } from './ExecutiveReport';
+import { RightPanel } from './RightPanel';
+import SourceExplorer from './SourceExplorer';
+import DebateArena from './DebateArena';
 
 const KnowledgeGraph = lazy(() => import('./KnowledgeGraph'));
 const ResearchRadio = lazy(() => import('./ResearchRadio'));
 const AIChatPanel = lazy(() => import('./AIChatPanel'));
 
+import { sendChatMessage } from '../lib/api';
+import { cn } from '../lib/utils';
+
 interface ResultsPanelProps {
     result: AnalysisResult;
 }
 
-const TABS = [
-    { id: 'overview', icon: FileText, label: 'Final Insight' },
-    { id: 'chat', icon: MessageSquare, label: 'AI Chat' },
-    { id: 'radio', icon: Radio, label: 'Research Radio' },
-    { id: 'arguments', icon: Zap, label: 'Arguments' },
-    { id: 'evaluation', icon: AlertTriangle, label: 'Evaluation' },
-    { id: 'graph', icon: Network, label: 'Citation Map' },
-    { id: 'gaps', icon: Search, label: 'Research Gaps' },
-];
-
-function Section({ icon: Icon, title, color, children }: {
-    icon: React.ElementType; title: string; color: string; children: React.ReactNode
-}) {
-    return (
-        <div className="glass-premium rounded-2xl p-5 animate-slide-up">
-            <div className={`flex items-center gap-2 mb-3 ${color}`}>
-                <Icon className="w-4 h-4" />
-                <h4 className="font-bold text-sm tracking-tight">{title}</h4>
-            </div>
-            <div className="text-sm text-slate-300 leading-relaxed prose prose-invert prose-sm max-w-none">
-                {children}
-            </div>
-        </div>
-    );
-}
-
-function MarkdownContent({ text }: { text: string }) {
-    return (
-        <ReactMarkdown
-            components={{
-                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                li: ({ children }) => <li className="ml-4 mb-1">{children}</li>,
-                strong: ({ children }) => <strong className="text-slate-100 font-semibold">{children}</strong>,
-            }}
-        >
-            {text}
-        </ReactMarkdown>
-    );
-}
-
 export default function ResultsPanel({ result }: ResultsPanelProps) {
-    const [activeTab, setActiveTab] = useState('overview');
+    // Accordions and UI state (all collapsed by default)
+    const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
+    const [isDebateOpen, setIsDebateOpen] = useState(false);
+    const [isGraphOpen, setIsGraphOpen] = useState(false);
+    const [isRadioOpen, setIsRadioOpen] = useState(false);
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [isSourcesOpen, setIsSourcesOpen] = useState(false);
+
+    // Chat State
     const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
     const [chatInput, setChatInput] = useState('');
     const [isChatLoading, setIsChatLoading] = useState(false);
+
+    // Automatically open right side panel only when complete research evidence is resolved
+    useEffect(() => {
+        if (result && result.papers && result.papers.length > 0) {
+            setIsRightPanelOpen(true);
+        } else {
+            setIsRightPanelOpen(false);
+        }
+    }, [result]);
 
     const handleSendMessage = async () => {
         if (!chatInput.trim() || isChatLoading) return;
@@ -92,226 +69,164 @@ export default function ResultsPanel({ result }: ResultsPanelProps) {
         }
     };
 
-    const exportToBibTeX = () => {
-        const bib = result.papers.map((p, i) => {
-            const authorPart = p.authors?.[0]?.split(' ')?.[0]?.toLowerCase() || 'anon';
-            const key = authorPart + (p.year || '2024') + i;
-            return `@article{${key},\n  title={${p.title}},\n  author={${p.authors?.join(' and ') || 'Anonymous'}},\n  year={${p.year || '2024'}},\n  url={${p.url || ''}}\n}`;
-        }).join('\n\n');
-
-        const blob = new Blob([bib], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `researchpilot_citations_${result.query_id || 'export'}.bib`;
-        a.click();
-    };
-
-    const exportToCSV = () => {
-        const headers = ['Title', 'Authors', 'Year', 'Source', 'URL'];
-        const rows = result.papers.map(p => [
-            `"${p.title.replace(/"/g, '""')}"`,
-            `"${p.authors?.join(', ').replace(/"/g, '""')}"`,
-            p.year,
-            p.source,
-            p.url
-        ]);
-        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `researchpilot_citations_${result.query_id || 'export'}.csv`;
-        a.click();
-    };
-
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start animate-fade-in">
+        <div className="flex relative overflow-hidden animate-fade-in font-sans min-h-screen">
             
-            {/* Left Content Column (Main Workspace - 3 cols) */}
-            <div className="lg:col-span-3 space-y-6">
-                {/* Custom Styled Tab bar */}
-                <div className="flex items-center gap-1.5 p-1.5 bg-black/45 backdrop-blur-xl border border-white/5 rounded-2xl overflow-x-auto">
-                    {TABS.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-300 ${
-                                activeTab === tab.id
-                                    ? 'bg-brand-500/20 text-brand-300 border border-brand-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)]'
-                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
+            {/* Center Content Workspace */}
+            <div className={cn(
+                "flex-1 transition-all duration-300 overflow-y-auto px-4 pb-20",
+                isRightPanelOpen ? "mr-80" : "mr-0"
+            )}>
+                <div className="max-w-3xl mx-auto space-y-10">
+                    
+                    {/* Link back to home */}
+                    <div className="pb-2">
+                        <Link
+                            to="/"
+                            className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-350 uppercase tracking-widest transition-colors"
                         >
-                            <tab.icon className="w-4 h-4" />
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
+                            <ArrowLeft className="w-4 h-4" />
+                            Back to workspace
+                        </Link>
+                    </div>
 
-                {/* Tab Content Panels */}
-                <div className="space-y-6 min-h-[500px]">
-                    {activeTab === 'overview' && (
-                        <div className="space-y-6">
-                            {/* Insight Card */}
-                            <div className="relative group animate-slide-up">
-                                <div className="absolute -inset-0.5 bg-gradient-to-r from-brand-600 via-purple-600 to-emerald-500 rounded-3xl blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
-                                <div className="relative glass-premium rounded-3xl p-8 border border-white/10 shadow-2xl">
-                                    <div className="flex items-center justify-between mb-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                                                <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-white font-bold text-lg tracking-tight">Executive Summary Brief</h3>
-                                                <div className="flex items-center gap-1.5 mt-0.5">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                    <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">Synthesized Intelligence</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="hidden sm:flex border border-white/5 bg-white/5 px-3 py-1.5 rounded-xl items-center gap-1.5">
-                                            <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
-                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Neural-Consensus v2</span>
-                                        </div>
-                                    </div>
+                    {/* 1. Executive Summary Report (The Hero) */}
+                    <section className="mb-10">
+                        <ExecutiveReport result={result} />
+                    </section>
 
-                                    <div className="text-slate-200 text-base leading-relaxed font-medium prose prose-invert max-w-none">
-                                        <MarkdownContent text={result.final_insight} />
-                                    </div>
+                    {/* 2. Sources Accordion */}
+                    <section className="border-t border-slate-800/40 pt-8 space-y-4">
+                        <div className="border border-slate-900 bg-slate-950/20 rounded-xl overflow-hidden">
+                            <button
+                                type="button"
+                                onClick={() => setIsSourcesOpen(!isSourcesOpen)}
+                                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.01] transition-colors text-xs font-bold text-slate-400"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <span className="text-[10px] text-slate-500">{isSourcesOpen ? '▼' : '▶'}</span>
+                                    <span className="uppercase tracking-widest">Explore Sources</span>
+                                </span>
+                                <span className="text-[10px] text-slate-500 bg-white/5 px-2 py-0.5 rounded font-mono font-bold">
+                                    {result.papers?.length || 0} papers
+                                </span>
+                            </button>
+                            {isSourcesOpen && (
+                                <div className="p-5 border-t border-slate-900 bg-slate-950/40">
+                                    <SourceExplorer result={result} />
                                 </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Section icon={Map} title="Research Strategy" color="text-indigo-400">
-                                    <MarkdownContent text={result.research_strategy} />
-                                </Section>
-                                <Section icon={BookOpen} title="Evidence Scope" color="text-purple-400">
-                                    <MarkdownContent text={result.key_evidence} />
-                                </Section>
-                            </div>
+                            )}
                         </div>
-                    )}
+                    </section>
 
-                    {activeTab === 'arguments' && (
-                        <div className="space-y-6">
-                            <Section icon={ThumbsUp} title="Supporting Claims" color="text-emerald-400">
-                                <MarkdownContent text={result.supporting_arguments} />
-                            </Section>
-                            <Section icon={ThumbsDown} title="Counter Claims" color="text-rose-400">
-                                <MarkdownContent text={result.counterarguments} />
-                            </Section>
+                    {/* 3. Advanced Tools Accordions */}
+                    <section className="space-y-4">
+                        <div className="pt-2 pb-1">
+                            <h4 className="text-[10px] font-bold text-slate-550 uppercase tracking-widest">Advanced Research Tools</h4>
                         </div>
-                    )}
 
-                    {activeTab === 'evaluation' && (
-                        <div className="space-y-6">
-                            <Section icon={AlertTriangle} title="Critical Disputes" color="text-amber-400">
-                                <MarkdownContent text={result.contradictions} />
-                            </Section>
-                            <Section icon={Shield} title="Methodology Audit" color="text-indigo-400">
-                                <MarkdownContent text={result.critical_evaluation} />
-                            </Section>
+                        {/* Accordion: View Expert Debate */}
+                        <div className="border border-slate-900 bg-slate-950/20 rounded-xl overflow-hidden">
+                            <button
+                                type="button"
+                                onClick={() => setIsDebateOpen(!isDebateOpen)}
+                                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.01] transition-colors text-xs font-bold text-slate-400"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <span className="text-[10px] text-slate-500">{isDebateOpen ? '▼' : '▶'}</span>
+                                    <span className="uppercase tracking-widest">View Expert Debate</span>
+                                </span>
+                                <span className="text-[9px] text-slate-600 font-bold uppercase">Pro vs Con Arena</span>
+                            </button>
+                            {isDebateOpen && (
+                                <div className="p-5 border-t border-slate-900 bg-slate-950/40">
+                                    <DebateArena steps={{}} result={result} />
+                                </div>
+                            )}
                         </div>
-                    )}
 
-                    {activeTab === 'gaps' && (
-                        <Section icon={Search} title="Future Research Vectors" color="text-teal-400">
-                            <MarkdownContent text={result.research_gaps} />
-                        </Section>
-                    )}
+                        {/* Accordion: View Citation Network */}
+                        <div className="border border-slate-900 bg-slate-950/20 rounded-xl overflow-hidden">
+                            <button
+                                type="button"
+                                onClick={() => setIsGraphOpen(!isGraphOpen)}
+                                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.01] transition-colors text-xs font-bold text-slate-400"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <span className="text-[10px] text-slate-500">{isGraphOpen ? '▼' : '▶'}</span>
+                                    <span className="uppercase tracking-widest">View Citation Network</span>
+                                </span>
+                                <span className="text-[9px] text-slate-600 font-bold uppercase">Graph Model</span>
+                            </button>
+                            {isGraphOpen && (
+                                <div className="p-5 border-t border-slate-900 bg-slate-950/40">
+                                    <Suspense fallback={<div className="h-64 flex flex-col items-center justify-center text-xs text-slate-500 gap-2"><Loader2 className="w-6 h-6 animate-spin text-indigo-400"/><span>Loading Citation Graph...</span></div>}>
+                                        <KnowledgeGraph result={result} />
+                                    </Suspense>
+                                </div>
+                            )}
+                        </div>
 
-                    {activeTab === 'radio' && (
-                        <Suspense fallback={<div className="h-64 flex flex-col items-center justify-center text-xs text-slate-500 gap-2"><Loader2 className="w-6 h-6 animate-spin text-brand-400"/><span>Loading Research Radio...</span></div>}>
-                            <ResearchRadio context={`Research Summary: ${result.final_insight}\n\nKey Evidence: ${result.key_evidence}`} />
-                        </Suspense>
-                    )}
+                        {/* Accordion: Listen to Research Podcast */}
+                        <div className="border border-slate-900 bg-slate-950/20 rounded-xl overflow-hidden">
+                            <button
+                                type="button"
+                                onClick={() => setIsRadioOpen(!isRadioOpen)}
+                                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.01] transition-colors text-xs font-bold text-slate-400"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <span className="text-[10px] text-slate-500">{isRadioOpen ? '▼' : '▶'}</span>
+                                    <span className="uppercase tracking-widest">Listen to Research Podcast</span>
+                                </span>
+                                <span className="text-[9px] text-slate-600 font-bold uppercase">Audio Cast</span>
+                            </button>
+                            {isRadioOpen && (
+                                <div className="p-5 border-t border-slate-900 bg-slate-950/40">
+                                    <Suspense fallback={<div className="h-64 flex flex-col items-center justify-center text-xs text-slate-500 gap-2"><Loader2 className="w-6 h-6 animate-spin text-brand-400"/><span>Loading Research Radio...</span></div>}>
+                                        <ResearchRadio context={`Research Summary: ${result.final_insight}`} />
+                                    </Suspense>
+                                </div>
+                            )}
+                        </div>
 
-                    {activeTab === 'graph' && (
-                        <Suspense fallback={<div className="h-64 flex flex-col items-center justify-center text-xs text-slate-500 gap-2"><Loader2 className="w-6 h-6 animate-spin text-indigo-400"/><span>Loading Citation Graph...</span></div>}>
-                            <KnowledgeGraph result={result} />
-                        </Suspense>
-                    )}
-
-                    {activeTab === 'chat' && (
-                        <Suspense fallback={<div className="h-64 flex flex-col items-center justify-center text-xs text-slate-500 gap-2"><Loader2 className="w-6 h-6 animate-spin text-indigo-400"/><span>Loading Chat Panel...</span></div>}>
-                            <AIChatPanel
-                                messages={messages}
-                                chatInput={chatInput}
-                                setChatInput={setChatInput}
-                                handleSendMessage={handleSendMessage}
-                                isChatLoading={isChatLoading}
-                            />
-                        </Suspense>
-                    )}
+                        {/* Accordion: Open AI Research Assistant */}
+                        <div className="border border-slate-900 bg-slate-950/20 rounded-xl overflow-hidden">
+                            <button
+                                type="button"
+                                onClick={() => setIsChatOpen(!isChatOpen)}
+                                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.01] transition-colors text-xs font-bold text-slate-400"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <span className="text-[10px] text-slate-500">{isChatOpen ? '▼' : '▶'}</span>
+                                    <span className="uppercase tracking-widest">Open AI Research Assistant</span>
+                                </span>
+                                <span className="text-[9px] text-slate-600 font-bold uppercase">Interactive QA</span>
+                            </button>
+                            {isChatOpen && (
+                                <div className="p-5 border-t border-slate-900 bg-slate-950/40">
+                                    <Suspense fallback={<div className="h-64 flex flex-col items-center justify-center text-xs text-slate-500 gap-2"><Loader2 className="w-6 h-6 animate-spin text-indigo-400"/><span>Loading Chat Panel...</span></div>}>
+                                        <AIChatPanel
+                                            messages={messages}
+                                            chatInput={chatInput}
+                                            setChatInput={setChatInput}
+                                            handleSendMessage={handleSendMessage}
+                                            isChatLoading={isChatLoading}
+                                        />
+                                    </Suspense>
+                                </div>
+                            )}
+                        </div>
+                    </section>
                 </div>
             </div>
 
-            {/* Right Static Sidebar (Citation & Sources Library - 1 col) */}
-            <div className="lg:col-span-1 space-y-6">
-                
-                {/* Evidence strength panel */}
-                {hasDisplayableEvidence(result.evidence_analysis) && (
-                <div className="glass-premium rounded-3xl p-6 border border-white/5 relative overflow-hidden">
-                    <EvidenceStrengthMeter score={result.evidence_analysis} />
-                </div>
-                )}
-
-                {/* Document Sources List */}
-                <div className="glass-premium rounded-3xl p-6 border border-white/5 space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-white/5">
-                        <div className="flex items-center gap-2 text-indigo-400">
-                            <BookOpen className="w-4 h-4" />
-                            <h4 className="text-xs font-bold uppercase tracking-widest">Library Sources</h4>
-                        </div>
-                        <span className="text-[10px] font-bold text-slate-500 bg-white/5 px-2 py-0.5 rounded-md">
-                            {result.papers.length}
-                        </span>
-                    </div>
-
-                    <div className="space-y-3 max-h-[380px] overflow-y-auto custom-scrollbar pr-1">
-                        {result.papers.map((paper, i) => (
-                            <div key={paper.id ?? i} className="p-3 bg-black/25 hover:bg-white/[0.02] border border-white/5 rounded-xl transition-all group flex flex-col justify-between gap-2 min-w-0">
-                                <div>
-                                    <h5 className="text-xs font-bold text-slate-200 leading-snug truncate group-hover:text-white transition-colors" title={paper.title}>
-                                        {paper.title}
-                                    </h5>
-                                    <p className="text-[10px] text-slate-500 mt-1 truncate">
-                                        {paper.authors?.join(', ') || 'Unknown'}
-                                    </p>
-                                </div>
-                                <div className="flex items-center justify-between mt-1 text-[9px] font-bold text-slate-500">
-                                    <span className="uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5">{paper.source}</span>
-                                    {paper.url && (
-                                        <a href={paper.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-brand-400 hover:text-brand-300">
-                                            Open <ExternalLink className="w-2.5 h-2.5" />
-                                        </a>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Quick export tools */}
-                    <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/5">
-                        <button
-                            onClick={exportToBibTeX}
-                            className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-[10px] font-bold text-indigo-300 uppercase tracking-widest transition-all"
-                        >
-                            <Download className="w-3.5 h-3.5" />
-                            BibTeX
-                        </button>
-                        <button
-                            onClick={exportToCSV}
-                            className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 text-[10px] font-bold text-teal-300 uppercase tracking-widest transition-all"
-                        >
-                            <Download className="w-3.5 h-3.5" />
-                            CSV
-                        </button>
-                    </div>
-                </div>
-            </div>
+            {/* Right Panel sidebar (opens automatically ONLY when evidence is complete) */}
+            <RightPanel
+                isOpen={isRightPanelOpen && !!result && result.papers && result.papers.length > 0}
+                onClose={() => setIsRightPanelOpen(false)}
+                result={result}
+                isLoading={false}
+            />
         </div>
     );
 }
-

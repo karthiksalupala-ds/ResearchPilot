@@ -86,7 +86,14 @@ export default function KnowledgeGraph({ result }: KnowledgeGraphProps) {
         }
     }, [result]);
 
-    if (!result || nodes.length === 0) return null;
+    if (!result || nodes.length === 0) {
+        return (
+            <div className="glass rounded-3xl p-8 border border-white/10 text-center max-w-5xl mx-auto mb-12 animate-fade-in">
+                <Network className="w-8 h-8 text-slate-500 mx-auto mb-3" />
+                <p className="text-sm text-slate-400">Only partial evidence could be retrieved. Some databases were unavailable.</p>
+            </div>
+        );
+    }
 
     // Center coordinates
     const centerX = 350;
