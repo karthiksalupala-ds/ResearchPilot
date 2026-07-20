@@ -47,6 +47,8 @@ class ModeratorAgent(BaseAgent):
         pro2_args: str,
         con1_args: str,
         con2_args: str,
+        system_prompt: str = None,
+        temperature: float = None,
     ) -> tuple[str, str]:
         prompt = (
             f"User's Question: {refined_question}\n\n"
@@ -56,4 +58,4 @@ class ModeratorAgent(BaseAgent):
             f"--- Con Argument 2 (Focus: Systemic/Long-term Risks) ---\n{con2_args[:1200]}\n\n"
             f"Produce the structured research document now:"
         )
-        return await self._call_llm(prompt, max_tokens=1600)
+        return await self._call_llm(prompt, max_tokens=1600, system_prompt=system_prompt, temperature=temperature)

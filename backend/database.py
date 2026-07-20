@@ -161,9 +161,9 @@ async def get_cached_analysis(user_query: str) -> Optional[dict]:
     if not client:
         return None
     try:
-        # Find the query first (case-insensitive)
+        # Find the query first (case-insensitive) and join with research_analysis in a single request
         query_res = client.table("research_queries")\
-            .select("id, refined_query")\
+            .select("id, refined_query, research_analysis(*)")\
             .ilike("user_query", user_query)\
             .order("timestamp", desc=True)\
             .limit(1)\
@@ -172,20 +172,15 @@ async def get_cached_analysis(user_query: str) -> Optional[dict]:
         if not query_res.data:
             return None
             
-        query_id = query_res.data[0]["id"]
-        refined_query = query_res.data[0]["refined_query"]
+        row = query_res.data[0]
+        query_id = row["id"]
+        refined_query = row["refined_query"]
         
-        # Get the analysis for this query
-        analysis_res = client.table("research_analysis")\
-            .select("*")\
-            .eq("query_id", query_id)\
-            .limit(1)\
-            .execute()
-            
-        if not analysis_res.data:
+        analysis_list = row.get("research_analysis", [])
+        if not analysis_list:
             return None
             
-        analysis = analysis_res.data[0]
+        analysis = analysis_list[0]
         return {
             "query_id": query_id,
             "refined_query": refined_query,

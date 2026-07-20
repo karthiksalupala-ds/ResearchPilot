@@ -11,7 +11,7 @@ function ComingSoonLabel() {
     );
 }
 
-export const Sidebar: React.FC = () => {
+export const Sidebar = React.memo(() => {
     const { user, signOut } = useAuth();
     const navigate = useNavigate();
 
@@ -116,4 +116,4 @@ export const Sidebar: React.FC = () => {
             </div>
         </aside>
     );
-};
+});

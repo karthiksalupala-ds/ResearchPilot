@@ -8,7 +8,7 @@ interface ReasoningPipelineProps {
     isActive: boolean;
 }
 
-export default function ReasoningPipeline({ steps, isActive }: ReasoningPipelineProps) {
+function ReasoningPipeline({ steps, isActive }: ReasoningPipelineProps) {
     if (!isActive && Object.keys(steps).length === 0) return null;
 
     const activeStep = Object.values(steps).find(s => s.status === 'running');
@@ -69,3 +69,5 @@ export default function ReasoningPipeline({ steps, isActive }: ReasoningPipeline
         </div>
     );
 }
+
+export default React.memo(ReasoningPipeline);

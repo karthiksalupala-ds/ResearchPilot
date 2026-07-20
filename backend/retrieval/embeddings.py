@@ -81,12 +81,22 @@ async def _openai_embedding(text: str) -> List[float]:
     return response.data[0].embedding
 
 
+async def _openai_embeddings_batch(texts: List[str]) -> List[List[float]]:
+    from openai import AsyncOpenAI
+    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    response = await client.embeddings.create(
+        model="text-embedding-3-small",
+        input=[t[:8000] for t in texts],
+    )
+    return [e.embedding for e in response.data]
+
+
 async def generate_embeddings_batch(texts: List[str]) -> List[List[float]]:
     """Generate embeddings for multiple texts efficiently."""
     provider = settings.embedding_provider.lower()
     if provider == "openai" and settings.openai_api_key:
         try:
-            return [await _openai_embedding(t) for t in texts]
+            return await _openai_embeddings_batch(texts)
         except Exception as e:
             print(f"[Embeddings] Batch OpenAI embedding error: {e}. Trying fallback...")
     

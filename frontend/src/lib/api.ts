@@ -44,6 +44,17 @@ export function analyzeResearch(
     onDone: OnDone,
 ): () => void {
     const controller = new AbortController();
+    const startTime = performance.now();
+    let firstSSETime: number | null = null;
+    const stepStartTimes: Record<string, number> = {};
+    const labelMap: Record<string, string> = {
+        'cache_lookup': 'Cache lookup',
+        'query_refinement': 'Query refinement',
+        'retrieval': 'Retrieval',
+        'debate': 'Debate',
+        'final_insight': 'Synthesis',
+        'evaluation': 'Evaluation'
+    };
 
     (async () => {
         try {
@@ -86,9 +97,28 @@ export function analyzeResearch(
                         const event = JSON.parse(jsonStr) as { event: string; data: unknown };
                         if (event.event === 'step') {
                             const stepData = event.data as PipelineStep;
+                            
+                            if (!firstSSETime) {
+                                firstSSETime = performance.now();
+                                console.log(`[PERF] Time to first SSE event: ${Math.round(firstSSETime - startTime)}ms`);
+                            }
+                            
+                            if (stepData.status === 'running') {
+                                stepStartTimes[stepData.step] = performance.now();
+                            } else if (stepData.status === 'done') {
+                                const start = stepStartTimes[stepData.step] || startTime;
+                                const duration = performance.now() - start;
+                                const label = labelMap[stepData.step] || stepData.step;
+                                console.log(`[PERF] ${label}: ${duration < 1000 ? Math.round(duration) + 'ms' : (duration / 1000).toFixed(1) + 's'}`);
+                            }
+                            
                             onStep({ ...stepData, timestamp: Date.now() });
                         }
-                        if (event.event === 'result') onResult(event.data as AnalysisResult);
+                        if (event.event === 'result') {
+                            const totalTime = performance.now() - startTime;
+                            console.log(`[PERF] Total: ${(totalTime / 1000).toFixed(1)}s`);
+                            onResult(event.data as AnalysisResult);
+                        }
                         if (event.event === 'error') {
                             onError(friendlyError((event.data as { message: string }).message || 'Research failed'));
                         }

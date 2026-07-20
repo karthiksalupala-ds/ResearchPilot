@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -13,9 +13,11 @@ import DebateArena from '../components/DebateArena';
 import { ExecutiveReport } from '../components/ExecutiveReport';
 import { Sidebar } from '../components/Sidebar';
 import { RightPanel } from '../components/RightPanel';
-import KnowledgeGraph from '../components/KnowledgeGraph';
-import ResearchRadio from '../components/ResearchRadio';
 import EvidenceStrengthMeter, { hasDisplayableEvidence } from '../components/EvidenceStrengthMeter';
+
+const KnowledgeGraph = lazy(() => import('../components/KnowledgeGraph'));
+const ResearchRadio = lazy(() => import('../components/ResearchRadio'));
+const AIChatPanel = lazy(() => import('../components/AIChatPanel'));
 import { analyzeResearch, sendChatMessage, friendlyError } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -345,84 +347,29 @@ export default function HomePage() {
                                                         <div className="min-h-[400px]">
                                                             {/* Citation Graph */}
                                                             {advancedTab === 'citation-graph' && (
-                                                                <KnowledgeGraph result={result} />
+                                                                <Suspense fallback={<div className="h-64 flex flex-col items-center justify-center text-xs text-slate-500 gap-2"><Loader2 className="w-6 h-6 animate-spin text-indigo-400"/><span>Loading Citation Graph...</span></div>}>
+                                                                    <KnowledgeGraph result={result} />
+                                                                </Suspense>
                                                             )}
 
                                                             {/* Research Radio */}
                                                             {advancedTab === 'radio' && (
-                                                                <ResearchRadio context={`Research Summary: ${result.final_insight}\n\nKey Evidence: ${result.key_evidence}`} />
+                                                                <Suspense fallback={<div className="h-64 flex flex-col items-center justify-center text-xs text-slate-500 gap-2"><Loader2 className="w-6 h-6 animate-spin text-brand-400"/><span>Loading Research Radio...</span></div>}>
+                                                                    <ResearchRadio context={`Research Summary: ${result.final_insight}\n\nKey Evidence: ${result.key_evidence}`} />
+                                                                </Suspense>
                                                             )}
 
                                                             {/* AI Chat */}
                                                             {advancedTab === 'chat' && (
-                                                                <div className="flex flex-col h-[520px] bg-[#0f172a]/50 border border-slate-800 rounded-xl overflow-hidden">
-                                                                    <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-4">
-                                                                        {messages.length === 0 ? (
-                                                                            <div className="h-full flex items-center justify-center text-center px-6">
-                                                                                <div className="max-w-xs">
-                                                                                    <MessageSquare className="w-10 h-10 text-indigo-400 mx-auto mb-4 opacity-20" />
-                                                                                    <h3 className="text-sm font-bold text-slate-300 mb-2">Interactive Research Assistant</h3>
-                                                                                    <p className="text-xs text-slate-500 leading-relaxed">
-                                                                                        Ask follow-up questions about this research. The AI will evaluate against retrieved papers.
-                                                                                    </p>
-                                                                                </div>
-                                                                            </div>
-                                                                        ) : (
-                                                                            <>
-                                                                                {messages.map((msg, i) => (
-                                                                                    <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                                                                        {msg.role === 'assistant' && (
-                                                                                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
-                                                                                                <Bot className="w-4 h-4 text-indigo-400" />
-                                                                                            </div>
-                                                                                        )}
-                                                                                        <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${msg.role === 'user'
-                                                                                            ? 'bg-indigo-600 text-white rounded-tr-none'
-                                                                                            : 'bg-white/5 border border-white/10 text-slate-200 rounded-tl-none'
-                                                                                        }`}>
-                                                                                            <MarkdownContent text={msg.content} />
-                                                                                        </div>
-                                                                                        {msg.role === 'user' && (
-                                                                                            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
-                                                                                                <User className="w-4 h-4 text-indigo-400" />
-                                                                                            </div>
-                                                                                        )}
-                                                                                    </div>
-                                                                                ))}
-                                                                                {isChatLoading && (
-                                                                                    <div className="flex gap-3 justify-start">
-                                                                                        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
-                                                                                            <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
-                                                                                        </div>
-                                                                                        <div className="bg-white/5 border border-white/10 text-slate-400 rounded-2xl rounded-tl-none px-4 py-3 text-sm italic">
-                                                                                            Formulating response...
-                                                                                        </div>
-                                                                                    </div>
-                                                                                )}
-                                                                            </>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="p-4 bg-black/45 border-t border-white/5">
-                                                                        <div className="relative">
-                                                                            <input
-                                                                                type="text"
-                                                                                value={chatInput}
-                                                                                onChange={(e) => setChatInput(e.target.value)}
-                                                                                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                                                                placeholder="Ask a follow-up question..."
-                                                                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500/40 transition-all pr-12"
-                                                                                disabled={isChatLoading}
-                                                                            />
-                                                                            <button
-                                                                                onClick={handleSendMessage}
-                                                                                disabled={isChatLoading || !chatInput.trim()}
-                                                                                className="absolute right-2 top-1.5 p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-all disabled:opacity-50"
-                                                                            >
-                                                                                {isChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
+                                                                <Suspense fallback={<div className="h-64 flex flex-col items-center justify-center text-xs text-slate-500 gap-2"><Loader2 className="w-6 h-6 animate-spin text-indigo-400"/><span>Loading Chat Panel...</span></div>}>
+                                                                    <AIChatPanel
+                                                                        messages={messages}
+                                                                        chatInput={chatInput}
+                                                                        setChatInput={setChatInput}
+                                                                        handleSendMessage={handleSendMessage}
+                                                                        isChatLoading={isChatLoading}
+                                                                    />
+                                                                </Suspense>
                                                             )}
 
                                                             {/* Source Explorer */}

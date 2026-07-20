@@ -2,6 +2,7 @@
 Research API routes – SSE streaming research analysis pipeline.
 """
 import json
+import asyncio
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from models import ResearchRequest, ChatRequest
@@ -77,15 +78,26 @@ async def start_radio(request: dict):
     """Generate a podcast script and return the first few audio-enabled turns."""
     try:
         context = request.get("context", "")
+        
+        import time
+        t0 = time.perf_counter()
         script = await orchestrator.generate_debate_script(context)
         
-        # Hydrate script with audio URLs (for the first 3 turns as a start)
-        for turn in script[:3]:
+        # Hydrate script with audio URLs (for the first 3 turns as a start) concurrently
+        async def hydrate_turn(turn):
             voice = "lead" if turn["speaker"] == "Alloy" else "support"
             try:
                 turn["audio_url"] = await audio_service.generate_tts(turn["text"], voice)
             except Exception:
                 turn["audio_url"] = None
+
+        await asyncio.gather(*[hydrate_turn(turn) for turn in script[:3]])
+        
+        elapsed = time.perf_counter() - t0
+        if elapsed < 1:
+            print(f"[PERF] Podcast generation: {elapsed * 1000:.0f}ms")
+        else:
+            print(f"[PERF] Podcast generation: {elapsed:.1f}s")
             
         return {"script": script}
     except Exception:

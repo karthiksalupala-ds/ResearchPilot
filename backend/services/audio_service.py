@@ -1,7 +1,8 @@
 import os
 import hashlib
+import asyncio
 from typing import Optional
-from openai import OpenAI
+from openai import AsyncOpenAI
 from pathlib import Path
 
 class AudioService:
@@ -26,7 +27,7 @@ class AudioService:
             if not api_key:
                 print("[AudioService] Warning: OPENAI_API_KEY not found in settings.")
                 return None
-            self._client = OpenAI(api_key=api_key)
+            self._client = AsyncOpenAI(api_key=api_key)
         return self._client
 
     async def generate_tts(self, text: str, voice_type: str = "lead") -> Optional[str]:
@@ -49,12 +50,13 @@ class AudioService:
             return f"/static/audio/{text_hash}.mp3"
 
         try:
-            response = self.client.audio.speech.create(
+            response = await self.client.audio.speech.create(
                 model="tts-1",
                 voice=voice,
                 input=text
             )
-            response.stream_to_file(file_path)
+            content = await response.aread()
+            await asyncio.to_thread(file_path.write_bytes, content)
             return f"/static/audio/{text_hash}.mp3"
         except Exception as e:
             print(f"[AudioService] Error generating TTS: {e}")

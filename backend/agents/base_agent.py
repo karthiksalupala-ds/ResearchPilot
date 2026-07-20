@@ -11,7 +11,13 @@ class BaseAgent:
         self.temperature = temperature
         self.provider = provider
 
-    async def _call_llm(self, user_message: str, max_tokens: int = 2048) -> tuple[str, str]:
+    async def _call_llm(
+        self, 
+        user_message: str, 
+        max_tokens: int = 2048, 
+        system_prompt: Optional[str] = None, 
+        temperature: Optional[float] = None
+    ) -> tuple[str, str]:
         """
         Call the configured LLM provider with automatic fallback.
         Returns a tuple of (response_text, provider_used).
@@ -47,13 +53,13 @@ class BaseAgent:
         for provider in available_providers:
             try:
                 if provider == "groq":
-                    return await self._call_groq(user_message, max_tokens), "groq"
+                    return await self._call_groq(user_message, max_tokens, system_prompt, temperature), "groq"
                 elif provider == "openai":
-                    return await self._call_openai(user_message, max_tokens), "openai"
+                    return await self._call_openai(user_message, max_tokens, system_prompt, temperature), "openai"
                 elif provider == "openrouter":
-                    return await self._call_openrouter(user_message, max_tokens), "openrouter"
+                    return await self._call_openrouter(user_message, max_tokens, system_prompt, temperature), "openrouter"
                 elif provider == "gemini":
-                    return await self._call_gemini(user_message, max_tokens), "gemini"
+                    return await self._call_gemini(user_message, max_tokens, system_prompt, temperature), "gemini"
             except Exception as e:
                 print(f"Fallback: Provider {provider} failed with error: {str(e)}")
                 last_error = e
@@ -62,58 +68,64 @@ class BaseAgent:
         # If all fail
         raise last_error or Exception("All LLM providers failed.")
 
-    def _build_messages(self, user_message: str) -> list:
+    def _build_messages(self, user_message: str, system_prompt: Optional[str] = None) -> list:
         messages = []
-        if self.system_prompt:
-            messages.append({"role": "system", "content": self.system_prompt})
+        sys_prompt = system_prompt if system_prompt is not None else self.system_prompt
+        if sys_prompt:
+            messages.append({"role": "system", "content": sys_prompt})
         messages.append({"role": "user", "content": user_message})
         return messages
 
-    async def _call_groq(self, user_message: str, max_tokens: int) -> str:
+    async def _call_groq(self, user_message: str, max_tokens: int, system_prompt: Optional[str], temperature: Optional[float]) -> str:
         from groq import AsyncGroq
         client = AsyncGroq(api_key=settings.groq_api_key)
+        temp = temperature if temperature is not None else self.temperature
         response = await client.chat.completions.create(
             model="llama-3.1-8b-instant",  # Much faster than 70b for real-time use
-            messages=self._build_messages(user_message),
-            temperature=self.temperature,
+            messages=self._build_messages(user_message, system_prompt),
+            temperature=temp,
             max_tokens=max_tokens,
         )
         return response.choices[0].message.content or ""
 
-    async def _call_openai(self, user_message: str, max_tokens: int) -> str:
+    async def _call_openai(self, user_message: str, max_tokens: int, system_prompt: Optional[str], temperature: Optional[float]) -> str:
         from openai import AsyncOpenAI
         client = AsyncOpenAI(api_key=settings.openai_api_key)
+        temp = temperature if temperature is not None else self.temperature
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=self._build_messages(user_message),
-            temperature=self.temperature,
+            messages=self._build_messages(user_message, system_prompt),
+            temperature=temp,
             max_tokens=max_tokens,
         )
         return response.choices[0].message.content or ""
 
-    async def _call_openrouter(self, user_message: str, max_tokens: int) -> str:
+    async def _call_openrouter(self, user_message: str, max_tokens: int, system_prompt: Optional[str], temperature: Optional[float]) -> str:
         from openai import AsyncOpenAI
         client = AsyncOpenAI(
             api_key=settings.openrouter_api_key,
             base_url="https://openrouter.ai/api/v1",
         )
+        temp = temperature if temperature is not None else self.temperature
         response = await client.chat.completions.create(
             model="meta-llama/llama-3.3-70b-instruct",
-            messages=self._build_messages(user_message),
-            temperature=self.temperature,
+            messages=self._build_messages(user_message, system_prompt),
+            temperature=temp,
             max_tokens=max_tokens,
         )
         return response.choices[0].message.content or ""
 
-    async def _call_gemini(self, user_message: str, max_tokens: int) -> str:
+    async def _call_gemini(self, user_message: str, max_tokens: int, system_prompt: Optional[str], temperature: Optional[float]) -> str:
         import httpx
         url = (
             f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash"
             f":generateContent?key={settings.google_api_key}"
         )
+        sys_prompt = system_prompt if system_prompt is not None else self.system_prompt
+        temp = temperature if temperature is not None else self.temperature
         payload = {
-            "contents": [{"parts": [{"text": f"{self.system_prompt}\n\n{user_message}"}]}],
-            "generationConfig": {"maxOutputTokens": max_tokens, "temperature": self.temperature},
+            "contents": [{"parts": [{"text": f"{sys_prompt}\n\n{user_message}"}]}],
+            "generationConfig": {"maxOutputTokens": max_tokens, "temperature": temp},
         }
         async with httpx.AsyncClient(timeout=10.0) as client:  # 10s timeout instead of 30s
             resp = await client.post(url, json=payload)

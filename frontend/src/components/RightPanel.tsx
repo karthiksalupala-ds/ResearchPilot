@@ -10,7 +10,7 @@ interface RightPanelProps {
     isLoading?: boolean;
 }
 
-export const RightPanel: React.FC<RightPanelProps> = ({ isOpen, onClose, result, isLoading }) => {
+export const RightPanel = React.memo<RightPanelProps>(({ isOpen, onClose, result, isLoading }) => {
     const gapsArray: string[] = React.useMemo(() => {
         if (!result?.research_gaps) return [];
         if (Array.isArray(result.research_gaps)) return result.research_gaps as unknown as string[];
@@ -114,4 +114,4 @@ export const RightPanel: React.FC<RightPanelProps> = ({ isOpen, onClose, result,
             </div>
         </aside>
     );
-};
+});

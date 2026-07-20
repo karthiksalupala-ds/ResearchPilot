@@ -1,3 +1,4 @@
+import React from 'react';
 import type { EvidenceScore } from '../lib/types';
 
 interface Props {
@@ -39,7 +40,7 @@ export function hasDisplayableEvidence(score?: EvidenceScore | null): boolean {
     return true;
 }
 
-export default function EvidenceStrengthMeter({ score, isLoading }: Props) {
+function EvidenceStrengthMeter({ score, isLoading }: Props) {
     if (isLoading || !hasDisplayableEvidence(score)) {
         return (
             <div className="glass rounded-2xl p-5 space-y-3">
@@ -108,3 +109,5 @@ export default function EvidenceStrengthMeter({ score, isLoading }: Props) {
         </div>
     );
 }
+
+export default React.memo(EvidenceStrengthMeter);

@@ -24,6 +24,8 @@ class CriticAgent(BaseAgent):
         pro_args,
         con_args,
         final_insight: str,
+        system_prompt: str = None,
+        temperature: float = None,
     ) -> tuple[str, str]:
         # Handle list or string inputs
         if isinstance(pro_args, list):
@@ -41,4 +43,4 @@ class CriticAgent(BaseAgent):
             f"### Critical Evaluation\n[evaluate the analysis quality]\n"
             f"### Research Gaps & Future Directions\n[identify gaps]"
         )
-        return await self._call_llm(prompt, max_tokens=800)
+        return await self._call_llm(prompt, max_tokens=800, system_prompt=system_prompt, temperature=temperature)

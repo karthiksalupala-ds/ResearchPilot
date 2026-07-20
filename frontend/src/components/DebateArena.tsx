@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -199,7 +199,7 @@ function ArgumentRenderer({ text, isRunning }: { text: string; isRunning: boolea
     );
 }
 
-export default function DebateArena({ steps, result }: DebateArenaProps) {
+function DebateArena({ steps, result }: DebateArenaProps) {
     const debateStep = steps['debate'];
     const isDebateRunning = debateStep?.status === 'running';
     const isDebateDone = debateStep?.status === 'done' || result !== null;
@@ -354,3 +354,5 @@ export default function DebateArena({ steps, result }: DebateArenaProps) {
         </div>
     );
 }
+
+export default memo(DebateArena);

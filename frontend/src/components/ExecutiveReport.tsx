@@ -66,7 +66,7 @@ export const reportMarkdownComponents: Components = {
     ),
 };
 
-export const ExecutiveReport: React.FC<ExecutiveReportProps> = ({ result }) => {
+export const ExecutiveReport = React.memo<ExecutiveReportProps>(({ result }) => {
     return (
         <article className="bg-[#020617] border border-slate-800 rounded-xl overflow-hidden shadow-sm">
             <div className="bg-slate-900/50 px-6 py-4 border-b border-slate-800 flex items-center justify-between sticky top-0 z-10 backdrop-blur-md">
@@ -132,4 +132,4 @@ export const ExecutiveReport: React.FC<ExecutiveReportProps> = ({ result }) => {
             </div>
         </article>
     );
-};
+});
