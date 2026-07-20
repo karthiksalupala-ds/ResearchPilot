@@ -235,4 +235,4 @@ Frontend runs at `http://localhost:5173`.
 ---
 
 ## 👥 Authors
-**Team Quantum Hackers** — *Designed for evidence over bias.*
+**Team ResearchPilot** — *Designed for evidence over bias.*
