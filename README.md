@@ -5,15 +5,14 @@ ResearchPilot is an enterprise-grade agentic research intelligence engine design
 ---
 
 ## 📋 Table of Contents
-1. [Core Features & UI Redesign](#-core-features--ui-redesign)
-2. [Agentic Deep Research Architecture](#-agentic-deep-research-architecture)
-3. [System Architecture Flow](#-system-architecture-flow)
-4. [Backend API Endpoints](#-backend-api-endpoints)
-5. [Database Schemas & Supabase Integration](#-database-schemas--supabase-integration)
-6. [Frontend Design & Component System](#-frontend-design--component-system)
-7. [Performance Profile & Optimizations](#-performance-profile--optimizations)
-8. [Installation & Setup Guide](#-installation--setup-guide)
-9. [Deployment & Production Readiness](#-deployment--production-readiness)
+1. [🎨 Core Features & UI Redesign](#-core-features--ui-redesign)
+2. [🧠 Agentic Deep Research Architecture](#-agentic-deep-research-architecture)
+3. [📊 System Architecture Flow](#-system-architecture-flow)
+4. [📡 Backend API Endpoints](#-backend-api-endpoints)
+5. [💾 Database Schemas & Supabase Integration](#-database-schemas--supabase-integration)
+6. [⚡ Performance Profile & Optimizations](#-performance-profile--optimizations)
+7. [⚙️ Installation & Setup Guide](#-installation--setup-guide)
+8. [👥 Authors & Community](#-authors--community)
 
 ---
 
@@ -21,12 +20,12 @@ ResearchPilot is an enterprise-grade agentic research intelligence engine design
 
 ResearchPilot is styled as a calm, minimal, academic, and document-first research workspace inspired by **NotebookLM**, **ChatGPT**, and **Notion**.
 
-### 1. Document-First Visuals
+### 📄 1. Document-First Visuals
 - **Focused Workspace Layout**: Removed glowing card borders, neon effects, large shadows, and spatial panels. Spacing and margins are designed for focused reading.
 - **Answer is the Hero**: Renders reports with serif headings, clean lines, and standard separators (`<hr className="border-slate-800/50 my-8" />`).
 - **Inline Citation Hover Previews** ([ExecutiveReport.tsx](file:///c:/projects/ResearchPilot/frontend/src/components/ExecutiveReport.tsx)): Inline citations (e.g. `[PubMed • 2023]`) display popup details including the paper title, authors, abstract, database, and a direct "Open Paper" link.
 
-### 2. Collapsible Advanced Research Tools
+### ⚙️ 2. Collapsible Advanced Research Tools
 All auxiliary widgets are hidden by default to prevent cognitive overload, expanding only upon explicit user request:
 - `▶ View Research Process` — Single-line compact progress summary (`✓ Query refinement ✓ Academic retrieval ✓ Multi-agent debate ✓ Final synthesis`) expanding into a detailed stepper tracking agent states.
 - `▶ View Expert Debate` — Pro vs Con debate arena demonstrating opposing perspectives grounded in retrieved evidence.
@@ -41,7 +40,7 @@ All auxiliary widgets are hidden by default to prevent cognitive overload, expan
 
 ResearchPilot operates a **5-agent reasoning pipeline** that evaluates both sides of any research topic:
 
-| Agent | Module | Description |
+| 🤖 Agent | 📁 Module | 📝 Description |
 |---|---|---|
 | **Query Planner** | [planner.py](file:///c:/projects/ResearchPilot/backend/agents/planner.py) | Deconstructs the user query into 3-5 sub-queries targeting specific academic endpoints. |
 | **Scraper Agent** | [scraper.py](file:///c:/projects/ResearchPilot/backend/retrieval/scraper.py) | Custom `HTMLParser` that downloads webpage HTML, strips ads/scripts, and parses unstructured content into structured titles, dates, and summaries. |
@@ -49,7 +48,7 @@ ResearchPilot operates a **5-agent reasoning pipeline** that evaluates both side
 | **Con Debate 1 & 2** | [con_agent.py](file:///c:/projects/ResearchPilot/backend/agents/con_agent.py) | Identifies direct and long-term risks, limitations, and conflicts of interest. |
 | **Moderator Agent** | [moderator.py](file:///c:/projects/ResearchPilot/backend/agents/moderator.py) | Evaluates pro/con claims and synthesizes a balanced, structured academic briefing. |
 
-### Strict Moderator Rules:
+### 🛡️ Strict Moderator Rules:
 - **No Hallucinations**: Every major claim must be cited with a valid source (`[Source • Year](URL)`).
 - **Consensus Assessment**: Explicitly defines consensus metrics (Strong agreement, Mixed evidence, Contradictory evidence) and highlights discrepancies.
 - **Evidence Verification**: Ranks academic databases (PubMed, arXiv, Semantic Scholar) above web search blogs.
@@ -100,16 +99,16 @@ ResearchPilot operates a **5-agent reasoning pipeline** that evaluates both side
 
 ## ⚡ Performance Profile & Optimizations
 
-### 1. Database Cache Speedup
+### 💾 1. Database Cache Speedup
 Refactored [database.py](file:///c:/projects/ResearchPilot/backend/database.py) to check local cache hits using a single SQL select JOIN across `research_queries` and `research_analysis` tables. This eliminated double-trip latency, reducing cache verification down to a few milliseconds.
 
-### 2. Stateless Agent Processing
+### 🔄 2. Stateless Agent Processing
 Refactored [base_agent.py](file:///c:/projects/ResearchPilot/backend/agents/base_agent.py) to accept request-local overridden prompts and temperatures dynamically. This prevents race conditions and state corruption during high-concurrency debater execution.
 
-### 3. Concurrent Audio Synthesis
+### 🎙️ 3. Concurrent Audio Synthesis
 Modified [research.py](file:///c:/projects/ResearchPilot/backend/routes/research.py) to generate the initial 3 turns of the research podcast audio concurrently using `asyncio.gather()`. This cut user wait times for audio playback start by 60%.
 
-### 4. Dynamic Code Splitting
+### 📦 4. Dynamic Code Splitting
 Implemented lazy-loading wrapper chunks using React `lazy` and `<Suspense>` for expensive visual components (`KnowledgeGraph`, `ResearchRadio`, and `AIChatPanel`). This decreased initial bundle sizes and optimized time-to-interactive metrics.
 
 ---
@@ -118,7 +117,7 @@ Implemented lazy-loading wrapper chunks using React `lazy` and `<Suspense>` for 
 
 FastAPI exposes the following JSON and SSE endpoints:
 
-### 1. `POST /api/research/analyze`
+### 📥 1. `POST /api/research/analyze`
 Starts the multi-agent debate and research retrieval pipeline. Streams steps and progress via Server-Sent Events (SSE).
 *   **Request Payload:**
     ```json
@@ -138,7 +137,7 @@ Starts the multi-agent debate and research retrieval pipeline. Streams steps and
     - `event: moderator_synthesis`
     - `event: completed` (sends full `AnalysisResult` JSON object)
 
-### 2. `POST /api/research/chat`
+### 💬 2. `POST /api/research/chat`
 Context-aware follow-up research assistant.
 *   **Request Payload:**
     ```json
@@ -150,7 +149,7 @@ Context-aware follow-up research assistant.
     }
     ```
 
-### 3. `GET /api/research/saved/{query_id}`
+### 📂 3. `GET /api/research/saved/{query_id}`
 Loads saved analyses directly from Supabase.
 
 ---
@@ -159,7 +158,7 @@ Loads saved analyses directly from Supabase.
 
 ResearchPilot uses Supabase (PostgreSQL) for persistence and local caching.
 
-### Table: `research_queries`
+### 📝 Table: `research_queries`
 Tracks search inputs, parameters, and metadata:
 ```sql
 CREATE TABLE research_queries (
@@ -172,7 +171,7 @@ CREATE TABLE research_queries (
 );
 ```
 
-### Table: `research_analysis`
+### 📝 Table: `research_analysis`
 Stores the final reports, retrieved papers, and debate outputs:
 ```sql
 CREATE TABLE research_analysis (
@@ -194,13 +193,13 @@ CREATE TABLE research_analysis (
 
 ---
 
-## 🛠 Installation & Setup Guide
+## ⚙️ Installation & Setup Guide
 
-### 1. Prerequisites
+### 📋 Prerequisites
 - Python 3.11 or higher
 - Node.js v18 or higher
 
-### 2. Environment Variables (.env)
+### 🔑 Environment Variables (.env)
 Create a `.env` file inside `backend/` and fill in your keys:
 ```env
 # AI Providers
@@ -216,7 +215,7 @@ SUPABASE_URL=your_url_here
 SUPABASE_ANON_KEY=your_key_here
 ```
 
-### 3. Backend Setup
+### 🐍 Backend Setup
 ```bash
 cd backend
 pip install -r requirements.txt
@@ -224,7 +223,7 @@ uvicorn main:app --reload --port 8000
 ```
 Backend runs at `http://localhost:8000`.
 
-### 4. Frontend Setup
+### ⚛️ Frontend Setup
 ```bash
 cd frontend
 npm install
@@ -234,5 +233,11 @@ Frontend runs at `http://localhost:5173`.
 
 ---
 
+<<<<<<< HEAD
 ## 👥 Authors
 **Team ResearchPilot** — *Designed for evidence over bias.*
+=======
+## 👥 Authors & Community
+
+**Team Quantum Hackers** — *Designed for evidence over bias.*
+>>>>>>> 365db16 (docs: upgrade README with agentic deep research specs, visual cleanups, and icons)
